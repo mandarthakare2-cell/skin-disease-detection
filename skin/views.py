@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from PIL import Image
-import tensorflow as tf
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
@@ -14,69 +13,46 @@ from django.conf import settings
 from .models import PredictionHistory
 
 
-# ==========================================
-# AI MODEL PATH
-# ==========================================
+# ==================================================
+# MODEL CONFIGURATION
+# ==================================================
 
 MODEL_PATH = os.path.join(
     settings.BASE_DIR,
+    "skin",
     "skin_disease_model.keras"
 )
 
 model = None
-model_error = None
 
-
-# ==========================================
-# LOAD AI MODEL
-# ==========================================
 
 def get_model():
+    """
+    Load the AI model only when prediction is requested.
+    """
 
     global model
-    global model_error
 
-    # If already loaded, return it
-    if model is not None:
-        return model
+    if model is None:
 
-    # Check whether model file exists
-    if not os.path.exists(MODEL_PATH):
+        import tensorflow as tf
 
-        model_error = (
-            "AI model file not found. "
-            "Please check that skin_disease_model.keras "
-            "is in the project root folder."
-        )
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(
+                f"AI model file not found at: {MODEL_PATH}"
+            )
 
-        return None
-
-    try:
-
-        # Load .keras model
         model = tf.keras.models.load_model(
             MODEL_PATH,
             compile=False
         )
 
-        model_error = None
-
-        print("AI model loaded successfully!")
-
-        return model
-
-    except Exception as error:
-
-        model_error = f"Unable to load AI model: {str(error)}"
-
-        print(model_error)
-
-        return None
+    return model
 
 
-# ==========================================
+# ==================================================
 # CLASS NAMES
-# ==========================================
+# ==================================================
 
 CLASS_NAMES = [
     "Acne",
@@ -89,46 +65,71 @@ CLASS_NAMES = [
 ]
 
 
-# ==========================================
+# ==================================================
 # DISEASE INFORMATION
-# ==========================================
+# ==================================================
 
 DISEASE_INFO = {
 
-    "Acne":
-        "Acne is a common skin condition that may cause pimples and inflamed areas.",
+    "Acne": (
+        "Acne is a common skin condition that can cause "
+        "pimples and inflamed areas."
+    ),
 
-    "Dermatitis":
-        "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
+    "Dermatitis": (
+        "Dermatitis is skin inflammation that may cause "
+        "itching, redness, dryness, or irritation."
+    ),
 
-    "Eczema":
-        "Eczema may cause dry, itchy, inflamed, or irritated skin.",
+    "Eczema": (
+        "Eczema may cause dry, itchy, inflamed, or "
+        "irritated skin."
+    ),
 
-    "Melanoma":
-        "Melanoma is a serious skin condition. This AI prediction is not a medical diagnosis.",
+    "Melanoma": (
+        "Melanoma is a serious skin condition. "
+        "This AI prediction is not a medical diagnosis."
+    ),
 
-    "Psoriasis":
-        "Psoriasis may cause thickened or scaly patches on the skin.",
+    "Psoriasis": (
+        "Psoriasis may cause thickened or scaly patches "
+        "on the skin."
+    ),
 
-    "Ringworm":
-        "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
+    "Ringworm": (
+        "Ringworm is a fungal skin infection that may cause "
+        "itchy or ring-shaped patches."
+    ),
 
-    "Vitiligo":
-        "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
+    "Vitiligo": (
+        "Vitiligo causes areas of skin to lose pigment, "
+        "resulting in lighter patches."
+    )
 }
 
 
-# ==========================================
+# ==================================================
 # REGISTER
-# ==========================================
+# ==================================================
 
 def register_view(request):
 
     if request.method == "POST":
 
-        username = request.POST.get("username", "").strip()
-        email = request.POST.get("email", "").strip()
-        password = request.POST.get("password", "")
+        username = request.POST.get(
+            "username",
+            ""
+        ).strip()
+
+        email = request.POST.get(
+            "email",
+            ""
+        ).strip()
+
+        password = request.POST.get(
+            "password",
+            ""
+        )
 
         if not username or not email or not password:
 
@@ -143,7 +144,7 @@ def register_view(request):
 
             messages.error(
                 request,
-                "Username already exists. Please choose another username."
+                "Username already exists."
             )
 
         else:
@@ -167,9 +168,9 @@ def register_view(request):
     )
 
 
-# ==========================================
+# ==================================================
 # LOGIN
-# ==========================================
+# ==================================================
 
 def login_view(request):
 
@@ -213,9 +214,9 @@ def login_view(request):
     )
 
 
-# ==========================================
+# ==================================================
 # LOGOUT
-# ==========================================
+# ==================================================
 
 def logout_view(request):
 
@@ -224,47 +225,26 @@ def logout_view(request):
     return redirect("login")
 
 
-# ==========================================
-# HOME AND IMAGE ANALYSIS
-# ==========================================
+# ==================================================
+# HOME AND PREDICTION
+# ==================================================
 
 @login_required(login_url="login")
 def home(request):
 
     context = {}
 
-    # ======================================
-    # WHEN USER CLICKS ANALYZE BUTTON
-    # ======================================
-
     if request.method == "POST":
 
-        uploaded_image = request.FILES.get("image")
+        uploaded_image = request.FILES.get(
+            "image"
+        )
 
-        # Check image
         if not uploaded_image:
 
-            context = {
-                "message": "Please select an image first."
-            }
-
-            return render(
-                request,
-                "skin/home.html",
-                context
+            context["error"] = (
+                "Please select an image first."
             )
-
-        # ==================================
-        # LOAD AI MODEL
-        # ==================================
-
-        ai_model = get_model()
-
-        if ai_model is None:
-
-            context = {
-                "message": model_error
-            }
 
             return render(
                 request,
@@ -274,9 +254,9 @@ def home(request):
 
         try:
 
-            # ==================================
-            # SAVE IMAGE
-            # ==================================
+            # ------------------------------------------
+            # SAVE UPLOADED IMAGE
+            # ------------------------------------------
 
             fs = FileSystemStorage()
 
@@ -285,13 +265,18 @@ def home(request):
                 uploaded_image
             )
 
-            image_url = fs.url(filename)
+            image_url = fs.url(
+                filename
+            )
 
-            image_path = fs.path(filename)
+            image_path = fs.path(
+                filename
+            )
 
-            # ==================================
+
+            # ------------------------------------------
             # OPEN IMAGE
-            # ==================================
+            # ------------------------------------------
 
             image = Image.open(
                 image_path
@@ -305,9 +290,10 @@ def home(request):
                 (224, 224)
             )
 
-            # ==================================
+
+            # ------------------------------------------
             # PREPROCESS IMAGE
-            # ==================================
+            # ------------------------------------------
 
             image_array = np.array(
                 image,
@@ -323,14 +309,23 @@ def home(request):
                 axis=0
             )
 
-            # ==================================
+
+            # ------------------------------------------
+            # LOAD MODEL
+            # ------------------------------------------
+
+            ai_model = get_model()
+
+
+            # ------------------------------------------
             # PREDICT
-            # ==================================
+            # ------------------------------------------
 
             predictions = ai_model.predict(
                 image_array,
                 verbose=0
             )
+
 
             predicted_index = int(
                 np.argmax(
@@ -338,66 +333,44 @@ def home(request):
                 )
             )
 
+
             confidence = float(
                 np.max(
                     predictions[0]
                 ) * 100
             )
 
-            # Safety check
-            if predicted_index >= len(CLASS_NAMES):
 
-                context = {
-                    "image_url": image_url,
-                    "message": (
-                        "Prediction error: "
-                        "Model output does not match "
-                        "the number of disease classes."
-                    )
-                }
-
-                return render(
-                    request,
-                    "skin/home.html",
-                    context
-                )
-
-            # ==================================
-            # GET DISEASE NAME
-            # ==================================
-
-            predicted_disease = CLASS_NAMES[
-                predicted_index
-            ]
-
-            description = DISEASE_INFO.get(
-                predicted_disease,
-                "No description available."
+            predicted_disease = (
+                CLASS_NAMES[
+                    predicted_index
+                ]
             )
 
-            # ==================================
-            # SAVE PREDICTION HISTORY
-            # ==================================
 
-            try:
-
-                PredictionHistory.objects.create(
-                    user=request.user,
-                    image=filename,
-                    prediction=predicted_disease,
-                    confidence=confidence
+            description = (
+                DISEASE_INFO.get(
+                    predicted_disease,
+                    "No description available."
                 )
+            )
 
-            except Exception as database_error:
 
-                print(
-                    "History save error:",
-                    database_error
-                )
+            # ------------------------------------------
+            # SAVE HISTORY
+            # ------------------------------------------
 
-            # ==================================
+            PredictionHistory.objects.create(
+                user=request.user,
+                image=filename,
+                prediction=predicted_disease,
+                confidence=confidence
+            )
+
+
+            # ------------------------------------------
             # SEND RESULT TO HTML
-            # ==================================
+            # ------------------------------------------
 
             context = {
 
@@ -410,24 +383,34 @@ def home(request):
                     predicted_disease,
 
                 "confidence":
-                    round(confidence, 2),
+                    round(
+                        confidence,
+                        2
+                    ),
 
                 "description":
                     description
             }
 
-        except Exception as error:
 
-            print(
-                "Image analysis error:",
-                str(error)
-            )
+        except FileNotFoundError:
 
             context = {
 
-                "message":
-                    f"Error analyzing image: {str(error)}"
+                "error":
+                    "AI model file not found. "
+                    "Please check skin_disease_model.keras."
             }
+
+
+        except Exception as e:
+
+            context = {
+
+                "error":
+                    f"Unable to analyze image: {str(e)}"
+            }
+
 
     return render(
         request,
@@ -436,17 +419,21 @@ def home(request):
     )
 
 
-# ==========================================
+# ==================================================
 # PREDICTION HISTORY
-# ==========================================
+# ==================================================
 
 @login_required(login_url="login")
 def prediction_history(request):
 
-    history = PredictionHistory.objects.filter(
-        user=request.user
-    ).order_by(
-        "-created_at"
+    history = (
+        PredictionHistory.objects
+        .filter(
+            user=request.user
+        )
+        .order_by(
+            "-created_at"
+        )
     )
 
     return render(
