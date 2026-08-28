@@ -34,28 +34,28 @@ CLASS_NAMES = [
 # ==========================================================
 
 DISEASE_INFO = {
+    "Acne": "Acne is a common skin condition that can cause pimples and inflamed areas.",
 
-    "Acne":
-        "Acne is a common skin condition that can cause pimples and inflamed areas.",
+    "Dermatitis": "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
 
-    "Dermatitis":
-        "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
+    "Eczema": "Eczema may cause dry, itchy, inflamed, or irritated skin.",
 
-    "Eczema":
-        "Eczema may cause dry, itchy, inflamed, or irritated skin.",
+    "Melanoma": "Melanoma is a serious skin condition.",
 
-    "Melanoma":
-        "Melanoma is a serious skin condition that should be checked by a medical professional.",
+    "Psoriasis": "Psoriasis may cause thickened or scaly patches on the skin.",
 
-    "Psoriasis":
-        "Psoriasis may cause thickened or scaly patches on the skin.",
+    "Ringworm": "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
 
-    "Ringworm":
-        "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
-
-    "Vitiligo":
-        "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
+    "Vitiligo": "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
 }
+
+
+# ==========================================================
+# GLOBAL MODEL VARIABLES
+# ==========================================================
+
+MODEL = None
+MODEL_ERROR = None
 
 
 # ==========================================================
@@ -66,7 +66,7 @@ def find_model_path():
 
     possible_paths = [
 
-        # Model beside manage.py
+        # Model in main project folder
         os.path.join(
             settings.BASE_DIR,
             "skin_disease_model.keras"
@@ -87,9 +87,15 @@ def find_model_path():
             "skin_disease_model.keras"
         ),
 
-        # Old H5 format
+        # Alternative H5 locations
         os.path.join(
             settings.BASE_DIR,
+            "skin_disease_model.h5"
+        ),
+
+        os.path.join(
+            settings.BASE_DIR,
+            "skin",
             "skin_disease_model.h5"
         ),
 
@@ -103,7 +109,7 @@ def find_model_path():
 
     for path in possible_paths:
 
-        if os.path.exists(path):
+        if os.path.isfile(path):
             return path
 
     return None
@@ -113,23 +119,18 @@ def find_model_path():
 # LOAD AI MODEL
 # ==========================================================
 
-MODEL = None
-MODEL_ERROR = None
-
-
 def get_model():
 
     global MODEL
     global MODEL_ERROR
 
+    # Return already loaded model
     if MODEL is not None:
         return MODEL
 
-    if MODEL_ERROR is not None:
-        return None
-
     model_path = find_model_path()
 
+    # Model file not found
     if model_path is None:
 
         MODEL_ERROR = (
@@ -142,16 +143,22 @@ def get_model():
 
     try:
 
+        # Load model without compilation
         MODEL = tf.keras.models.load_model(
             model_path,
             compile=False
         )
 
+        MODEL_ERROR = None
+
         return MODEL
 
     except Exception as error:
 
-        MODEL_ERROR = f"Unable to load AI model: {str(error)}"
+        MODEL_ERROR = (
+            "Unable to load AI model: "
+            + str(error)
+        )
 
         return None
 
@@ -192,7 +199,7 @@ def register_view(request):
 
             messages.error(
                 request,
-                "Username already exists."
+                "Username already exists. Please choose another username."
             )
 
         else:
@@ -274,7 +281,7 @@ def logout_view(request):
 
 
 # ==========================================================
-# HOME / PREDICTION
+# HOME / IMAGE PREDICTION
 # ==========================================================
 
 @login_required(login_url="login")
@@ -284,15 +291,13 @@ def home(request):
 
     if request.method == "POST":
 
-        uploaded_image = request.FILES.get(
-            "image"
-        )
+        # Get uploaded image
+        uploaded_image = request.FILES.get("image")
 
-        if not uploaded_image:
+        if uploaded_image is None:
 
             context = {
-                "message":
-                    "Please select an image first."
+                "message": "Please select an image first."
             }
 
             return render(
@@ -322,7 +327,7 @@ def home(request):
         try:
 
             # --------------------------------------------------
-            # SAVE UPLOADED IMAGE
+            # SAVE IMAGE
             # --------------------------------------------------
 
             fs = FileSystemStorage()
@@ -332,13 +337,9 @@ def home(request):
                 uploaded_image
             )
 
-            image_path = fs.path(
-                filename
-            )
+            image_url = fs.url(filename)
 
-            image_url = fs.url(
-                filename
-            )
+            image_path = fs.path(filename)
 
             # --------------------------------------------------
             # OPEN IMAGE
@@ -348,10 +349,9 @@ def home(request):
                 image_path
             )
 
-            image = image.convert(
-                "RGB"
-            )
+            image = image.convert("RGB")
 
+            # Resize image according to model input
             image = image.resize(
                 (224, 224)
             )
@@ -373,7 +373,7 @@ def home(request):
             )
 
             # --------------------------------------------------
-            # AI PREDICTION
+            # MAKE PREDICTION
             # --------------------------------------------------
 
             predictions = model.predict(
@@ -393,6 +393,19 @@ def home(request):
                 ) * 100
             )
 
+            # Safety check
+            if predicted_index >= len(CLASS_NAMES):
+
+                context = {
+                    "message": "Model returned an invalid prediction."
+                }
+
+                return render(
+                    request,
+                    "skin/home.html",
+                    context
+                )
+
             predicted_disease = CLASS_NAMES[
                 predicted_index
             ]
@@ -403,7 +416,7 @@ def home(request):
             )
 
             # --------------------------------------------------
-            # SAVE HISTORY
+            # SAVE PREDICTION HISTORY
             # --------------------------------------------------
 
             PredictionHistory.objects.create(
@@ -415,7 +428,6 @@ def home(request):
                 prediction=predicted_disease,
 
                 confidence=confidence
-
             )
 
             # --------------------------------------------------
@@ -426,29 +438,26 @@ def home(request):
 
                 "image_url": image_url,
 
-                "message":
-                    "Image analyzed successfully!",
+                "message": "Image analyzed successfully!",
 
-                "prediction":
-                    predicted_disease,
+                "prediction": predicted_disease,
 
-                "confidence":
-                    round(
-                        confidence,
-                        2
-                    ),
+                "confidence": round(
+                    confidence,
+                    2
+                ),
 
-                "description":
-                    description
+                "description": description
             }
 
         except Exception as error:
 
             context = {
 
-                "message":
-                    f"Error analyzing image: {str(error)}"
-
+                "message": (
+                    "Error analyzing image: "
+                    + str(error)
+                )
             }
 
     return render(
@@ -466,23 +475,15 @@ def home(request):
 def prediction_history(request):
 
     history = PredictionHistory.objects.filter(
-
         user=request.user
-
     ).order_by(
-
         "-created_at"
-
     )
 
     return render(
-
         request,
-
         "skin/history.html",
-
         {
             "history": history
         }
-
     )
