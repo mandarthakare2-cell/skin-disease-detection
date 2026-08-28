@@ -1,5 +1,4 @@
 import os
-import gc
 import numpy as np
 from PIL import Image
 import tensorflow as tf
@@ -15,45 +14,9 @@ from django.conf import settings
 from .models import PredictionHistory
 
 
-# ==================================================
-# MODEL CONFIGURATION
-# ==================================================
-
-MODEL_PATH = os.path.join(
-    settings.BASE_DIR,
-    "skin",
-    "skin_disease_model.keras"
-)
-
-model = None
-
-
-def get_model():
-    """
-    Load the AI model only once.
-    This helps reduce repeated memory usage.
-    """
-
-    global model
-
-    if model is None:
-
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(
-                f"Model file not found: {MODEL_PATH}"
-            )
-
-        model = tf.keras.models.load_model(
-            MODEL_PATH,
-            compile=False
-        )
-
-    return model
-
-
-# ==================================================
+# ==========================================================
 # CLASS NAMES
-# ==================================================
+# ==========================================================
 
 CLASS_NAMES = [
     "Acne",
@@ -66,9 +29,9 @@ CLASS_NAMES = [
 ]
 
 
-# ==================================================
+# ==========================================================
 # DISEASE INFORMATION
-# ==================================================
+# ==========================================================
 
 DISEASE_INFO = {
 
@@ -82,7 +45,7 @@ DISEASE_INFO = {
         "Eczema may cause dry, itchy, inflamed, or irritated skin.",
 
     "Melanoma":
-        "Melanoma is a serious skin condition that requires professional medical evaluation.",
+        "Melanoma is a serious skin condition that should be checked by a medical professional.",
 
     "Psoriasis":
         "Psoriasis may cause thickened or scaly patches on the skin.",
@@ -95,9 +58,107 @@ DISEASE_INFO = {
 }
 
 
-# ==================================================
+# ==========================================================
+# FIND MODEL FILE
+# ==========================================================
+
+def find_model_path():
+
+    possible_paths = [
+
+        # Model beside manage.py
+        os.path.join(
+            settings.BASE_DIR,
+            "skin_disease_model.keras"
+        ),
+
+        # Model inside skin folder
+        os.path.join(
+            settings.BASE_DIR,
+            "skin",
+            "skin_disease_model.keras"
+        ),
+
+        # Model inside model folder
+        os.path.join(
+            settings.BASE_DIR,
+            "skin",
+            "model",
+            "skin_disease_model.keras"
+        ),
+
+        # Old H5 format
+        os.path.join(
+            settings.BASE_DIR,
+            "skin_disease_model.h5"
+        ),
+
+        os.path.join(
+            settings.BASE_DIR,
+            "skin",
+            "model",
+            "skin_disease_model.h5"
+        )
+    ]
+
+    for path in possible_paths:
+
+        if os.path.exists(path):
+            return path
+
+    return None
+
+
+# ==========================================================
+# LOAD AI MODEL
+# ==========================================================
+
+MODEL = None
+MODEL_ERROR = None
+
+
+def get_model():
+
+    global MODEL
+    global MODEL_ERROR
+
+    if MODEL is not None:
+        return MODEL
+
+    if MODEL_ERROR is not None:
+        return None
+
+    model_path = find_model_path()
+
+    if model_path is None:
+
+        MODEL_ERROR = (
+            "AI model file not found. "
+            "Please make sure skin_disease_model.keras "
+            "is uploaded to GitHub."
+        )
+
+        return None
+
+    try:
+
+        MODEL = tf.keras.models.load_model(
+            model_path,
+            compile=False
+        )
+
+        return MODEL
+
+    except Exception as error:
+
+        MODEL_ERROR = f"Unable to load AI model: {str(error)}"
+
+        return None
+
+
+# ==========================================================
 # REGISTER
-# ==================================================
+# ==========================================================
 
 def register_view(request):
 
@@ -155,9 +216,9 @@ def register_view(request):
     )
 
 
-# ==================================================
+# ==========================================================
 # LOGIN
-# ==================================================
+# ==========================================================
 
 def login_view(request):
 
@@ -186,9 +247,7 @@ def login_view(request):
                 user
             )
 
-            return redirect(
-                "home"
-            )
+            return redirect("home")
 
         else:
 
@@ -203,24 +262,20 @@ def login_view(request):
     )
 
 
-# ==================================================
+# ==========================================================
 # LOGOUT
-# ==================================================
+# ==========================================================
 
 def logout_view(request):
 
-    logout(
-        request
-    )
+    logout(request)
 
-    return redirect(
-        "login"
-    )
+    return redirect("login")
 
 
-# ==================================================
-# HOME AND PREDICTION
-# ==================================================
+# ==========================================================
+# HOME / PREDICTION
+# ==========================================================
 
 @login_required(login_url="login")
 def home(request):
@@ -246,11 +301,29 @@ def home(request):
                 context
             )
 
+        # --------------------------------------------------
+        # LOAD MODEL
+        # --------------------------------------------------
+
+        model = get_model()
+
+        if model is None:
+
+            context = {
+                "message": MODEL_ERROR
+            }
+
+            return render(
+                request,
+                "skin/home.html",
+                context
+            )
+
         try:
 
-            # ======================================
-            # SAVE IMAGE
-            # ======================================
+            # --------------------------------------------------
+            # SAVE UPLOADED IMAGE
+            # --------------------------------------------------
 
             fs = FileSystemStorage()
 
@@ -259,18 +332,17 @@ def home(request):
                 uploaded_image
             )
 
-            image_url = fs.url(
-                filename
-            )
-
             image_path = fs.path(
                 filename
             )
 
+            image_url = fs.url(
+                filename
+            )
 
-            # ======================================
+            # --------------------------------------------------
             # OPEN IMAGE
-            # ======================================
+            # --------------------------------------------------
 
             image = Image.open(
                 image_path
@@ -284,38 +356,27 @@ def home(request):
                 (224, 224)
             )
 
-
-            # ======================================
-            # CONVERT IMAGE TO ARRAY
-            # ======================================
+            # --------------------------------------------------
+            # PREPROCESS IMAGE
+            # --------------------------------------------------
 
             image_array = np.array(
                 image,
                 dtype=np.float32
             )
 
-            image_array = (
-                image_array / 255.0
-            )
+            image_array = image_array / 255.0
 
             image_array = np.expand_dims(
                 image_array,
                 axis=0
             )
 
+            # --------------------------------------------------
+            # AI PREDICTION
+            # --------------------------------------------------
 
-            # ======================================
-            # LOAD MODEL
-            # ======================================
-
-            ai_model = get_model()
-
-
-            # ======================================
-            # PREDICTION
-            # ======================================
-
-            predictions = ai_model.predict(
+            predictions = model.predict(
                 image_array,
                 verbose=0
             )
@@ -341,10 +402,9 @@ def home(request):
                 "No description available."
             )
 
-
-            # ======================================
+            # --------------------------------------------------
             # SAVE HISTORY
-            # ======================================
+            # --------------------------------------------------
 
             PredictionHistory.objects.create(
 
@@ -358,15 +418,13 @@ def home(request):
 
             )
 
-
-            # ======================================
-            # RESULT
-            # ======================================
+            # --------------------------------------------------
+            # SEND RESULT TO HTML
+            # --------------------------------------------------
 
             context = {
 
-                "image_url":
-                    image_url,
+                "image_url": image_url,
 
                 "message":
                     "Image analyzed successfully!",
@@ -382,36 +440,16 @@ def home(request):
 
                 "description":
                     description
-
             }
-
-
-            # Clear temporary Python objects
-            del image_array
-            del predictions
-
-            gc.collect()
-
-
-        except FileNotFoundError:
-
-            context = {
-
-                "message":
-                    "AI model file not found. Please check skin_disease_model.keras."
-
-            }
-
 
         except Exception as error:
 
             context = {
 
                 "message":
-                    f"Unable to analyze image: {str(error)}"
+                    f"Error analyzing image: {str(error)}"
 
             }
-
 
     return render(
         request,
@@ -420,17 +458,21 @@ def home(request):
     )
 
 
-# ==================================================
+# ==========================================================
 # PREDICTION HISTORY
-# ==================================================
+# ==========================================================
 
 @login_required(login_url="login")
 def prediction_history(request):
 
     history = PredictionHistory.objects.filter(
+
         user=request.user
+
     ).order_by(
+
         "-created_at"
+
     )
 
     return render(
@@ -440,8 +482,7 @@ def prediction_history(request):
         "skin/history.html",
 
         {
-            "history":
-                history
+            "history": history
         }
 
     )
