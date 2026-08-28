@@ -23,17 +23,9 @@ MODEL_PATH = os.path.join(
     "skin_disease_model.keras"
 )
 
-# If your model file is actually named skin_disease_model.h5,
-# change the above line to:
-#
-# MODEL_PATH = os.path.join(
-#     settings.BASE_DIR,
-#     "skin_disease_model.h5"
-# )
-
 
 # ==========================================
-# LAZY MODEL LOADING
+# LOAD MODEL ONLY WHEN NEEDED
 # ==========================================
 
 model = None
@@ -42,23 +34,37 @@ model = None
 def get_model():
     global model
 
-    if model is None:
+    # Model is already loaded
+    if model is not None:
+        return model
 
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(
-                f"Model file not found: {MODEL_PATH}"
-            )
+    # Check whether model file exists
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(
+            f"AI model file not found: {MODEL_PATH}"
+        )
 
+    try:
+        # Load the trained model
         model = tf.keras.models.load_model(
             MODEL_PATH,
             compile=False
         )
 
-    return model
+        return model
+
+    except Exception as error:
+
+        raise Exception(
+            f"Unable to load AI model: {str(error)}"
+        )
 
 
 # ==========================================
 # CLASS NAMES
+# IMPORTANT:
+# These must be in the SAME ORDER used
+# while training your model.
 # ==========================================
 
 CLASS_NAMES = [
@@ -78,34 +84,67 @@ CLASS_NAMES = [
 
 DISEASE_INFO = {
 
-    "Acne": "Acne is a common skin condition that can cause pimples and inflamed areas.",
+    "Acne": (
+        "Acne is a common skin condition that can cause "
+        "pimples and inflamed areas."
+    ),
 
-    "Dermatitis": "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
+    "Dermatitis": (
+        "Dermatitis is skin inflammation that may cause "
+        "itching, redness, dryness, or irritation."
+    ),
 
-    "Eczema": "Eczema may cause dry, itchy, inflamed, or irritated skin.",
+    "Eczema": (
+        "Eczema may cause dry, itchy, inflamed, "
+        "or irritated skin."
+    ),
 
-    "Melanoma": "Melanoma is a serious skin condition. AI predictions are not a medical diagnosis.",
+    "Melanoma": (
+        "Melanoma is a serious skin condition. "
+        "AI predictions are not a medical diagnosis."
+    ),
 
-    "Psoriasis": "Psoriasis may cause thickened or scaly patches on the skin.",
+    "Psoriasis": (
+        "Psoriasis may cause thickened or scaly "
+        "patches on the skin."
+    ),
 
-    "Ringworm": "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
+    "Ringworm": (
+        "Ringworm is a fungal skin infection that may "
+        "cause itchy or ring-shaped patches."
+    ),
 
-    "Vitiligo": "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
+    "Vitiligo": (
+        "Vitiligo causes areas of skin to lose pigment, "
+        "resulting in lighter patches."
+    )
 }
 
 
 # ==========================================
-# REGISTER
+# REGISTER USER
 # ==========================================
 
 def register_view(request):
 
     if request.method == "POST":
 
-        username = request.POST.get("username", "").strip()
-        email = request.POST.get("email", "").strip()
-        password = request.POST.get("password", "")
+        username = request.POST.get(
+            "username",
+            ""
+        ).strip()
 
+        email = request.POST.get(
+            "email",
+            ""
+        ).strip()
+
+        password = request.POST.get(
+            "password",
+            ""
+        )
+
+        # Validate fields
         if not username or not email or not password:
 
             messages.error(
@@ -113,15 +152,20 @@ def register_view(request):
                 "Please fill in all fields."
             )
 
-        elif User.objects.filter(username=username).exists():
+        # Check username
+        elif User.objects.filter(
+            username=username
+        ).exists():
 
             messages.error(
                 request,
-                "Username already exists. Please choose another username."
+                "Username already exists. "
+                "Please choose another username."
             )
 
         else:
 
+            # Create user
             User.objects.create_user(
                 username=username,
                 email=email,
@@ -130,7 +174,8 @@ def register_view(request):
 
             messages.success(
                 request,
-                "Registration successful. Please login."
+                "Registration successful. "
+                "Please login."
             )
 
             return redirect("login")
@@ -149,8 +194,15 @@ def login_view(request):
 
     if request.method == "POST":
 
-        username = request.POST.get("username", "").strip()
-        password = request.POST.get("password", "")
+        username = request.POST.get(
+            "username",
+            ""
+        ).strip()
+
+        password = request.POST.get(
+            "password",
+            ""
+        )
 
         user = authenticate(
             request,
@@ -158,9 +210,13 @@ def login_view(request):
             password=password
         )
 
+        # Successful login
         if user is not None:
 
-            login(request, user)
+            login(
+                request,
+                user
+            )
 
             return redirect("home")
 
@@ -189,7 +245,7 @@ def logout_view(request):
 
 
 # ==========================================
-# HOME / PREDICTION
+# HOME / IMAGE PREDICTION
 # ==========================================
 
 @login_required(login_url="login")
@@ -197,10 +253,14 @@ def home(request):
 
     context = {}
 
+    # Only process when form is submitted
     if request.method == "POST":
 
-        uploaded_image = request.FILES.get("image")
+        uploaded_image = request.FILES.get(
+            "image"
+        )
 
+        # Check image
         if not uploaded_image:
 
             context = {
@@ -215,18 +275,19 @@ def home(request):
 
         try:
 
-            # ==========================================
-            # CREATE MEDIA FOLDER
-            # ==========================================
+            # ======================================
+            # CREATE MEDIA DIRECTORY
+            # ======================================
 
             os.makedirs(
                 settings.MEDIA_ROOT,
                 exist_ok=True
             )
 
-            # ==========================================
+
+            # ======================================
             # SAVE UPLOADED IMAGE
-            # ==========================================
+            # ======================================
 
             fs = FileSystemStorage(
                 location=settings.MEDIA_ROOT,
@@ -238,79 +299,122 @@ def home(request):
                 uploaded_image
             )
 
-            image_url = fs.url(filename)
+            image_url = fs.url(
+                filename
+            )
 
-            image_path = fs.path(filename)
+            image_path = fs.path(
+                filename
+            )
 
-            # ==========================================
-            # CHECK IMAGE FILE
-            # ==========================================
 
-            if not os.path.exists(image_path):
+            # ======================================
+            # CHECK IMAGE EXISTS
+            # ======================================
+
+            if not os.path.exists(
+                image_path
+            ):
 
                 raise FileNotFoundError(
-                    f"Uploaded image not found: {image_path}"
+                    f"Uploaded image not found: "
+                    f"{image_path}"
                 )
 
-            # ==========================================
+
+            # ======================================
             # OPEN IMAGE
-            # ==========================================
+            # ======================================
 
-            image = Image.open(image_path)
+            image = Image.open(
+                image_path
+            )
 
-            image = image.convert("RGB")
+            # Convert to RGB
+            image = image.convert(
+                "RGB"
+            )
+
+
+            # ======================================
+            # RESIZE IMAGE
+            # ======================================
 
             image = image.resize(
                 (224, 224)
             )
+
+
+            # ======================================
+            # CONVERT IMAGE TO ARRAY
+            # ======================================
 
             image_array = np.array(
                 image,
                 dtype=np.float32
             )
 
+
+            # Normalize image
             image_array = image_array / 255.0
 
+
+            # Add batch dimension
             image_array = np.expand_dims(
                 image_array,
                 axis=0
             )
 
-            # ==========================================
-            # LOAD MODEL
-            # ==========================================
+
+            # ======================================
+            # LOAD AI MODEL
+            # ======================================
 
             prediction_model = get_model()
 
-            # ==========================================
-            # PREDICTION
-            # ==========================================
+
+            # ======================================
+            # PREDICT DISEASE
+            # ======================================
 
             predictions = prediction_model.predict(
                 image_array,
                 verbose=0
             )
 
+
+            # Get highest probability index
             predicted_index = int(
-                np.argmax(predictions[0])
+                np.argmax(
+                    predictions[0]
+                )
             )
 
+
+            # Calculate confidence
             confidence = float(
-                np.max(predictions[0]) * 100
+                np.max(
+                    predictions[0]
+                ) * 100
             )
 
+
+            # Get disease name
             predicted_disease = CLASS_NAMES[
                 predicted_index
             ]
 
+
+            # Get description
             description = DISEASE_INFO.get(
                 predicted_disease,
                 "No description available."
             )
 
-            # ==========================================
-            # SAVE HISTORY
-            # ==========================================
+
+            # ======================================
+            # SAVE PREDICTION HISTORY
+            # ======================================
 
             PredictionHistory.objects.create(
                 user=request.user,
@@ -319,26 +423,59 @@ def home(request):
                 confidence=confidence
             )
 
+
+            # ======================================
+            # SEND RESULT TO HTML
+            # ======================================
+
             context = {
+
                 "image_url": image_url,
-                "message": "Image analyzed successfully!",
-                "prediction": predicted_disease,
-                "confidence": round(confidence, 2),
-                "description": description
+
+                "message":
+                    "Image analyzed successfully!",
+
+                "prediction":
+                    predicted_disease,
+
+                "confidence":
+                    round(
+                        confidence,
+                        2
+                    ),
+
+                "description":
+                    description
             }
+
+
+        # ==========================================
+        # MODEL OR IMAGE FILE NOT FOUND
+        # ==========================================
 
         except FileNotFoundError as error:
 
             context = {
-                "message": str(error)
+
+                "message":
+                    f"File error: {str(error)}"
             }
+
+
+        # ==========================================
+        # ANY OTHER ERROR
+        # ==========================================
 
         except Exception as error:
 
             context = {
-                "message": f"Error analyzing image: {str(error)}"
+
+                "message":
+                    f"Error analyzing image: {str(error)}"
             }
 
+
+    # Render page
     return render(
         request,
         "skin/home.html",
@@ -355,7 +492,9 @@ def prediction_history(request):
 
     history = PredictionHistory.objects.filter(
         user=request.user
-    ).order_by("-created_at")
+    ).order_by(
+        "-created_at"
+    )
 
     return render(
         request,
