@@ -1,208 +1,366 @@
 import os
+
+# Reduce unnecessary TensorFlow resource usage
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import (
-    Conv2D,
-    MaxPooling2D,
-    Flatten,
-    Dense,
-    Dropout
-)
 
-# ==============================
-# SETTINGS
-# ==============================
 
-DATASET_PATH = "dataset"
-MODEL_PATH = "skin/model/skin_disease_model.h5"
-CLASS_NAMES_PATH = "class_names.txt"
+# ==========================================================
+# CONFIGURATION
+# ==========================================================
 
-IMAGE_SIZE = 224
+IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 16
 EPOCHS = 10
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ==============================
+DATASET_DIR = os.path.join(
+    BASE_DIR,
+    "dataset"
+)
+
+MODEL_PATH = os.path.join(
+    BASE_DIR,
+    "skin_disease_model.keras"
+)
+
+CLASS_NAMES_PATH = os.path.join(
+    BASE_DIR,
+    "class_names.txt"
+)
+
+
+# ==========================================================
 # CHECK DATASET
-# ==============================
+# ==========================================================
 
-print("\nChecking dataset...\n")
+if not os.path.exists(DATASET_DIR):
 
-if not os.path.exists(DATASET_PATH):
-    print("ERROR: Dataset folder not found!")
-    print("Expected location:", DATASET_PATH)
-    exit()
-
-
-# ==============================
-# CREATE MODEL FOLDER
-# ==============================
-
-os.makedirs("skin/model", exist_ok=True)
-
-
-# ==============================
-# IMAGE DATA GENERATOR
-# ==============================
-
-datagen = ImageDataGenerator(
-    rescale=1.0 / 255,
-    validation_split=0.2,
-    rotation_range=15,
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    zoom_range=0.1,
-    horizontal_flip=True
-)
-
-
-# ==============================
-# TRAINING DATA
-# ==============================
-
-train_data = datagen.flow_from_directory(
-    DATASET_PATH,
-    target_size=(IMAGE_SIZE, IMAGE_SIZE),
-    batch_size=BATCH_SIZE,
-    class_mode="categorical",
-    subset="training",
-    shuffle=True
-)
-
-
-# ==============================
-# VALIDATION DATA
-# ==============================
-
-validation_data = datagen.flow_from_directory(
-    DATASET_PATH,
-    target_size=(IMAGE_SIZE, IMAGE_SIZE),
-    batch_size=BATCH_SIZE,
-    class_mode="categorical",
-    subset="validation",
-    shuffle=True
-)
-
-
-# ==============================
-# SAVE CLASS NAMES
-# ==============================
-
-class_indices = train_data.class_indices
-
-class_names = [
-    name for name, index in
-    sorted(class_indices.items(), key=lambda item: item[1])
-]
-
-with open(CLASS_NAMES_PATH, "w") as file:
-    for class_name in class_names:
-        file.write(class_name + "\n")
-
-
-print("\nDisease Classes:")
-
-for index, name in enumerate(class_names):
-    print(f"{index} -> {name}")
-
-
-print("\nTotal Classes:", len(class_names))
-
-
-# ==============================
-# CREATE CNN MODEL
-# ==============================
-
-model = Sequential([
-
-    Conv2D(
-        32,
-        (3, 3),
-        activation="relu",
-        input_shape=(IMAGE_SIZE, IMAGE_SIZE, 3)
-    ),
-
-    MaxPooling2D(pool_size=(2, 2)),
-
-    Conv2D(
-        64,
-        (3, 3),
-        activation="relu"
-    ),
-
-    MaxPooling2D(pool_size=(2, 2)),
-
-    Conv2D(
-        128,
-        (3, 3),
-        activation="relu"
-    ),
-
-    MaxPooling2D(pool_size=(2, 2)),
-
-    Flatten(),
-
-    Dense(
-        256,
-        activation="relu"
-    ),
-
-    Dropout(0.5),
-
-    Dense(
-        len(class_names),
-        activation="softmax"
+    raise FileNotFoundError(
+        f"Dataset folder not found: {DATASET_DIR}"
     )
-])
 
 
-# ==============================
+# ==========================================================
+# LOAD TRAINING DATA
+# ==========================================================
+
+print("Loading training dataset...")
+
+
+train_dataset = tf.keras.utils.image_dataset_from_directory(
+
+    DATASET_DIR,
+
+    validation_split=0.2,
+
+    subset="training",
+
+    seed=123,
+
+    image_size=IMAGE_SIZE,
+
+    batch_size=BATCH_SIZE,
+
+    label_mode="int"
+)
+
+
+# ==========================================================
+# LOAD VALIDATION DATA
+# ==========================================================
+
+print("Loading validation dataset...")
+
+
+validation_dataset = tf.keras.utils.image_dataset_from_directory(
+
+    DATASET_DIR,
+
+    validation_split=0.2,
+
+    subset="validation",
+
+    seed=123,
+
+    image_size=IMAGE_SIZE,
+
+    batch_size=BATCH_SIZE,
+
+    label_mode="int"
+)
+
+
+# ==========================================================
+# GET CLASS NAMES
+# ==========================================================
+
+CLASS_NAMES = train_dataset.class_names
+
+print("\nDetected classes:")
+
+for index, class_name in enumerate(CLASS_NAMES):
+
+    print(f"{index}: {class_name}")
+
+
+# ==========================================================
+# SAVE CLASS NAMES
+# ==========================================================
+
+with open(
+    CLASS_NAMES_PATH,
+    "w",
+    encoding="utf-8"
+) as file:
+
+    for class_name in CLASS_NAMES:
+
+        file.write(
+            class_name + "\n"
+        )
+
+
+print(
+    f"\nClass names saved to: {CLASS_NAMES_PATH}"
+)
+
+
+# ==========================================================
+# PERFORMANCE OPTIMIZATION
+# ==========================================================
+
+AUTOTUNE = tf.data.AUTOTUNE
+
+
+train_dataset = train_dataset.prefetch(
+    AUTOTUNE
+)
+
+validation_dataset = validation_dataset.prefetch(
+    AUTOTUNE
+)
+
+
+# ==========================================================
+# DATA AUGMENTATION
+#
+# These layers are used during training.
+# ==========================================================
+
+data_augmentation = tf.keras.Sequential(
+
+    [
+
+        tf.keras.layers.RandomFlip(
+            "horizontal"
+        ),
+
+        tf.keras.layers.RandomRotation(
+            0.1
+        ),
+
+        tf.keras.layers.RandomZoom(
+            0.1
+        ),
+
+    ],
+
+    name="data_augmentation"
+)
+
+
+# ==========================================================
+# CREATE MODEL
+# ==========================================================
+
+num_classes = len(
+    CLASS_NAMES
+)
+
+
+model = tf.keras.Sequential(
+
+    [
+
+        tf.keras.layers.Input(
+            shape=(224, 224, 3)
+        ),
+
+
+        # Rescale pixel values
+        tf.keras.layers.Rescaling(
+            1.0 / 255.0
+        ),
+
+
+        # DATA AUGMENTATION
+        data_augmentation,
+
+
+        # CONVOLUTION BLOCK 1
+        tf.keras.layers.Conv2D(
+            32,
+            (3, 3),
+            activation="relu",
+            padding="same"
+        ),
+
+        tf.keras.layers.MaxPooling2D(
+            (2, 2)
+        ),
+
+
+        # CONVOLUTION BLOCK 2
+        tf.keras.layers.Conv2D(
+            64,
+            (3, 3),
+            activation="relu",
+            padding="same"
+        ),
+
+        tf.keras.layers.MaxPooling2D(
+            (2, 2)
+        ),
+
+
+        # CONVOLUTION BLOCK 3
+        tf.keras.layers.Conv2D(
+            128,
+            (3, 3),
+            activation="relu",
+            padding="same"
+        ),
+
+        tf.keras.layers.MaxPooling2D(
+            (2, 2)
+        ),
+
+
+        # REDUCE PARAMETERS
+        tf.keras.layers.GlobalAveragePooling2D(),
+
+
+        # DROPOUT
+        tf.keras.layers.Dropout(
+            0.3
+        ),
+
+
+        # OUTPUT LAYER
+        tf.keras.layers.Dense(
+            num_classes,
+            activation="softmax"
+        )
+
+    ]
+
+)
+
+
+# ==========================================================
 # COMPILE MODEL
-# ==============================
+# ==========================================================
 
 model.compile(
-    optimizer="adam",
-    loss="categorical_crossentropy",
-    metrics=["accuracy"]
+
+    optimizer=tf.keras.optimizers.Adam(
+        learning_rate=0.001
+    ),
+
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+
+    metrics=[
+        "accuracy"
+    ]
+
 )
 
 
-# ==============================
-# MODEL SUMMARY
-# ==============================
-
-print("\nModel Summary:\n")
+# ==========================================================
+# DISPLAY MODEL
+# ==========================================================
 
 model.summary()
 
 
-# ==============================
-# TRAIN MODEL
-# ==============================
+# ==========================================================
+# CALLBACKS
+# ==========================================================
 
-print("\nTraining Started...\n")
+early_stopping = tf.keras.callbacks.EarlyStopping(
 
+    monitor="val_loss",
 
-history = model.fit(
-    train_data,
-    validation_data=validation_data,
-    epochs=EPOCHS
+    patience=3,
+
+    restore_best_weights=True
 )
 
 
-# ==============================
-# SAVE TRAINED MODEL
-# ==============================
+# ==========================================================
+# TRAIN MODEL
+# ==========================================================
 
-model.save(MODEL_PATH)
+print("\nStarting model training...\n")
 
-print("\n================================")
-print("MODEL TRAINING COMPLETED!")
-print("================================")
 
-print("\nModel saved at:")
-print(MODEL_PATH)
+history = model.fit(
 
-print("\nClass names saved at:")
-print(CLASS_NAMES_PATH)
+    train_dataset,
+
+    validation_data=validation_dataset,
+
+    epochs=EPOCHS,
+
+    callbacks=[
+        early_stopping
+    ]
+
+)
+
+
+# ==========================================================
+# EVALUATE MODEL
+# ==========================================================
+
+loss, accuracy = model.evaluate(
+    validation_dataset
+)
+
+
+print("\n==============================")
+
+print(
+    f"Validation Loss: {loss:.4f}"
+)
+
+print(
+    f"Validation Accuracy: {accuracy * 100:.2f}%"
+)
+
+print("==============================\n")
+
+
+# ==========================================================
+# SAVE MODEL
+# ==========================================================
+
+model.save(
+    MODEL_PATH
+)
+
+
+print(
+    "Model successfully saved!"
+)
+
+print(
+    f"Model location: {MODEL_PATH}"
+)
+
+print(
+    f"Class names location: {CLASS_NAMES_PATH}"
+)
