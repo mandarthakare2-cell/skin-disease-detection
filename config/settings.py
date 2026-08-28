@@ -26,7 +26,11 @@ SECRET_KEY = 'django-insecure-$+i&r-3tby%i6^n-9bx!v9#k$w6n6ophqnmc2opt#3bn&_5jfv
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "skin-disease-detection-l8iy.onrender.com",
+    "localhost",
+    "127.0.0.1",
+]
 
 
 # Application definition
