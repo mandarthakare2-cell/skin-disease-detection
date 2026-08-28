@@ -15,7 +15,7 @@ from .models import PredictionHistory
 
 
 # ==========================================
-# LOAD TRAINED MODEL
+# MODEL PATH
 # ==========================================
 
 MODEL_PATH = os.path.join(
@@ -25,7 +25,24 @@ MODEL_PATH = os.path.join(
     "skin_disease_model.h5"
 )
 
-model = tf.keras.models.load_model(MODEL_PATH)
+
+# ==========================================
+# LAZY MODEL LOADING
+# ==========================================
+
+model = None
+
+
+def get_model():
+    global model
+
+    if model is None:
+        model = tf.keras.models.load_model(
+            MODEL_PATH,
+            compile=False
+        )
+
+    return model
 
 
 # ==========================================
@@ -208,10 +225,16 @@ def home(request):
             )
 
             # ==========================================
+            # LOAD MODEL ONLY WHEN NEEDED
+            # ==========================================
+
+            prediction_model = get_model()
+
+            # ==========================================
             # PREDICT DISEASE
             # ==========================================
 
-            predictions = model.predict(
+            predictions = prediction_model.predict(
                 image_array,
                 verbose=0
             )
