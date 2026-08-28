@@ -20,10 +20,16 @@ from .models import PredictionHistory
 
 MODEL_PATH = os.path.join(
     settings.BASE_DIR,
-    "skin",
-    "model",
-    "skin_disease_model.h5"
+    "skin_disease_model.keras"
 )
+
+# If your model file is actually named skin_disease_model.h5,
+# change the above line to:
+#
+# MODEL_PATH = os.path.join(
+#     settings.BASE_DIR,
+#     "skin_disease_model.h5"
+# )
 
 
 # ==========================================
@@ -37,6 +43,12 @@ def get_model():
     global model
 
     if model is None:
+
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(
+                f"Model file not found: {MODEL_PATH}"
+            )
+
         model = tf.keras.models.load_model(
             MODEL_PATH,
             compile=False
@@ -189,9 +201,37 @@ def home(request):
 
         uploaded_image = request.FILES.get("image")
 
-        if uploaded_image:
+        if not uploaded_image:
 
-            fs = FileSystemStorage()
+            context = {
+                "message": "Please select an image first."
+            }
+
+            return render(
+                request,
+                "skin/home.html",
+                context
+            )
+
+        try:
+
+            # ==========================================
+            # CREATE MEDIA FOLDER
+            # ==========================================
+
+            os.makedirs(
+                settings.MEDIA_ROOT,
+                exist_ok=True
+            )
+
+            # ==========================================
+            # SAVE UPLOADED IMAGE
+            # ==========================================
+
+            fs = FileSystemStorage(
+                location=settings.MEDIA_ROOT,
+                base_url=settings.MEDIA_URL
+            )
 
             filename = fs.save(
                 uploaded_image.name,
@@ -203,14 +243,26 @@ def home(request):
             image_path = fs.path(filename)
 
             # ==========================================
-            # OPEN AND PREPROCESS IMAGE
+            # CHECK IMAGE FILE
+            # ==========================================
+
+            if not os.path.exists(image_path):
+
+                raise FileNotFoundError(
+                    f"Uploaded image not found: {image_path}"
+                )
+
+            # ==========================================
+            # OPEN IMAGE
             # ==========================================
 
             image = Image.open(image_path)
 
             image = image.convert("RGB")
 
-            image = image.resize((224, 224))
+            image = image.resize(
+                (224, 224)
+            )
 
             image_array = np.array(
                 image,
@@ -225,13 +277,13 @@ def home(request):
             )
 
             # ==========================================
-            # LOAD MODEL ONLY WHEN NEEDED
+            # LOAD MODEL
             # ==========================================
 
             prediction_model = get_model()
 
             # ==========================================
-            # PREDICT DISEASE
+            # PREDICTION
             # ==========================================
 
             predictions = prediction_model.predict(
@@ -257,7 +309,7 @@ def home(request):
             )
 
             # ==========================================
-            # SAVE PREDICTION HISTORY
+            # SAVE HISTORY
             # ==========================================
 
             PredictionHistory.objects.create(
@@ -275,10 +327,16 @@ def home(request):
                 "description": description
             }
 
-        else:
+        except FileNotFoundError as error:
 
             context = {
-                "message": "Please select an image first."
+                "message": str(error)
+            }
+
+        except Exception as error:
+
+            context = {
+                "message": f"Error analyzing image: {str(error)}"
             }
 
     return render(
