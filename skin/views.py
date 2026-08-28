@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from PIL import Image
-import tensorflow as tf
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
@@ -11,12 +10,14 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
 from django.conf import settings
 
+import keras
+
 from .models import PredictionHistory
 
 
-# ==========================================================
+# =====================================================
 # CLASS NAMES
-# ==========================================================
+# =====================================================
 
 CLASS_NAMES = [
     "Acne",
@@ -29,143 +30,97 @@ CLASS_NAMES = [
 ]
 
 
-# ==========================================================
+# =====================================================
 # DISEASE INFORMATION
-# ==========================================================
+# =====================================================
 
 DISEASE_INFO = {
-    "Acne": "Acne is a common skin condition that can cause pimples and inflamed areas.",
 
-    "Dermatitis": "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
+    "Acne": (
+        "Acne is a common skin condition that can cause "
+        "pimples and inflamed areas."
+    ),
 
-    "Eczema": "Eczema may cause dry, itchy, inflamed, or irritated skin.",
+    "Dermatitis": (
+        "Dermatitis is skin inflammation that may cause "
+        "itching, redness, dryness, or irritation."
+    ),
 
-    "Melanoma": "Melanoma is a serious skin condition.",
+    "Eczema": (
+        "Eczema may cause dry, itchy, inflamed, or "
+        "irritated skin."
+    ),
 
-    "Psoriasis": "Psoriasis may cause thickened or scaly patches on the skin.",
+    "Melanoma": (
+        "Melanoma is a serious skin condition that affects "
+        "skin cells."
+    ),
 
-    "Ringworm": "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
+    "Psoriasis": (
+        "Psoriasis may cause thickened or scaly patches "
+        "on the skin."
+    ),
 
-    "Vitiligo": "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
+    "Ringworm": (
+        "Ringworm is a fungal skin infection that may cause "
+        "itchy or ring-shaped patches."
+    ),
+
+    "Vitiligo": (
+        "Vitiligo causes areas of skin to lose pigment, "
+        "resulting in lighter patches."
+    )
 }
 
 
-# ==========================================================
-# GLOBAL MODEL VARIABLES
-# ==========================================================
+# =====================================================
+# MODEL PATH
+# =====================================================
+# Your GitHub screenshot shows:
+#
+# skin_disease_model.keras
+#
+# in the ROOT project folder.
+#
+# BASE_DIR points to the project root.
+# =====================================================
 
-MODEL = None
-MODEL_ERROR = None
-
-
-# ==========================================================
-# FIND MODEL FILE
-# ==========================================================
-
-def find_model_path():
-
-    possible_paths = [
-
-        # Model in main project folder
-        os.path.join(
-            settings.BASE_DIR,
-            "skin_disease_model.keras"
-        ),
-
-        # Model inside skin folder
-        os.path.join(
-            settings.BASE_DIR,
-            "skin",
-            "skin_disease_model.keras"
-        ),
-
-        # Model inside model folder
-        os.path.join(
-            settings.BASE_DIR,
-            "skin",
-            "model",
-            "skin_disease_model.keras"
-        ),
-
-        # Alternative H5 locations
-        os.path.join(
-            settings.BASE_DIR,
-            "skin_disease_model.h5"
-        ),
-
-        os.path.join(
-            settings.BASE_DIR,
-            "skin",
-            "skin_disease_model.h5"
-        ),
-
-        os.path.join(
-            settings.BASE_DIR,
-            "skin",
-            "model",
-            "skin_disease_model.h5"
-        )
-    ]
-
-    for path in possible_paths:
-
-        if os.path.isfile(path):
-            return path
-
-    return None
+MODEL_PATH = os.path.join(
+    settings.BASE_DIR,
+    "skin_disease_model.keras"
+)
 
 
-# ==========================================================
-# LOAD AI MODEL
-# ==========================================================
+# =====================================================
+# LOAD MODEL
+# =====================================================
+
+model = None
+
 
 def get_model():
 
-    global MODEL
-    global MODEL_ERROR
+    global model
 
-    # Return already loaded model
-    if MODEL is not None:
-        return MODEL
+    if model is None:
 
-    model_path = find_model_path()
+        if not os.path.exists(MODEL_PATH):
 
-    # Model file not found
-    if model_path is None:
+            raise FileNotFoundError(
+                f"Model file not found at: {MODEL_PATH}"
+            )
 
-        MODEL_ERROR = (
-            "AI model file not found. "
-            "Please make sure skin_disease_model.keras "
-            "is uploaded to GitHub."
-        )
-
-        return None
-
-    try:
-
-        # Load model without compilation
-        MODEL = tf.keras.models.load_model(
-            model_path,
+        model = keras.models.load_model(
+            MODEL_PATH,
             compile=False
         )
 
-        MODEL_ERROR = None
-
-        return MODEL
-
-    except Exception as error:
-
-        MODEL_ERROR = (
-            "Unable to load AI model: "
-            + str(error)
-        )
-
-        return None
+    return model
 
 
-# ==========================================================
+# =====================================================
 # REGISTER
-# ==========================================================
+# =====================================================
 
 def register_view(request):
 
@@ -223,9 +178,9 @@ def register_view(request):
     )
 
 
-# ==========================================================
+# =====================================================
 # LOGIN
-# ==========================================================
+# =====================================================
 
 def login_view(request):
 
@@ -269,9 +224,9 @@ def login_view(request):
     )
 
 
-# ==========================================================
+# =====================================================
 # LOGOUT
-# ==========================================================
+# =====================================================
 
 def logout_view(request):
 
@@ -280,9 +235,9 @@ def logout_view(request):
     return redirect("login")
 
 
-# ==========================================================
+# =====================================================
 # HOME / IMAGE PREDICTION
-# ==========================================================
+# =====================================================
 
 @login_required(login_url="login")
 def home(request):
@@ -291,10 +246,15 @@ def home(request):
 
     if request.method == "POST":
 
-        # Get uploaded image
-        uploaded_image = request.FILES.get("image")
+        uploaded_image = request.FILES.get(
+            "image"
+        )
 
-        if uploaded_image is None:
+        # -----------------------------------------------
+        # CHECK IMAGE
+        # -----------------------------------------------
+
+        if not uploaded_image:
 
             context = {
                 "message": "Please select an image first."
@@ -306,29 +266,11 @@ def home(request):
                 context
             )
 
-        # --------------------------------------------------
-        # LOAD MODEL
-        # --------------------------------------------------
-
-        model = get_model()
-
-        if model is None:
-
-            context = {
-                "message": MODEL_ERROR
-            }
-
-            return render(
-                request,
-                "skin/home.html",
-                context
-            )
-
         try:
 
-            # --------------------------------------------------
+            # -------------------------------------------
             # SAVE IMAGE
-            # --------------------------------------------------
+            # -------------------------------------------
 
             fs = FileSystemStorage()
 
@@ -337,46 +279,59 @@ def home(request):
                 uploaded_image
             )
 
-            image_url = fs.url(filename)
+            image_url = fs.url(
+                filename
+            )
 
-            image_path = fs.path(filename)
+            image_path = fs.path(
+                filename
+            )
 
-            # --------------------------------------------------
+            # -------------------------------------------
             # OPEN IMAGE
-            # --------------------------------------------------
+            # -------------------------------------------
 
             image = Image.open(
                 image_path
             )
 
-            image = image.convert("RGB")
+            image = image.convert(
+                "RGB"
+            )
 
-            # Resize image according to model input
             image = image.resize(
                 (224, 224)
             )
 
-            # --------------------------------------------------
-            # PREPROCESS IMAGE
-            # --------------------------------------------------
+            # -------------------------------------------
+            # CONVERT IMAGE TO ARRAY
+            # -------------------------------------------
 
             image_array = np.array(
                 image,
                 dtype=np.float32
             )
 
+            # Normalize image
             image_array = image_array / 255.0
 
+            # Add batch dimension
             image_array = np.expand_dims(
                 image_array,
                 axis=0
             )
 
-            # --------------------------------------------------
-            # MAKE PREDICTION
-            # --------------------------------------------------
+            # -------------------------------------------
+            # LOAD AI MODEL
+            # -------------------------------------------
 
-            predictions = model.predict(
+            loaded_model = get_model()
+
+            # -------------------------------------------
+            # MAKE PREDICTION
+            # -------------------------------------------
+
+            predictions = loaded_model.predict(
                 image_array,
                 verbose=0
             )
@@ -393,18 +348,9 @@ def home(request):
                 ) * 100
             )
 
-            # Safety check
-            if predicted_index >= len(CLASS_NAMES):
-
-                context = {
-                    "message": "Model returned an invalid prediction."
-                }
-
-                return render(
-                    request,
-                    "skin/home.html",
-                    context
-                )
+            # -------------------------------------------
+            # GET DISEASE NAME
+            # -------------------------------------------
 
             predicted_disease = CLASS_NAMES[
                 predicted_index
@@ -415,30 +361,28 @@ def home(request):
                 "No description available."
             )
 
-            # --------------------------------------------------
+            # -------------------------------------------
             # SAVE PREDICTION HISTORY
-            # --------------------------------------------------
+            # -------------------------------------------
 
             PredictionHistory.objects.create(
-
                 user=request.user,
-
                 image=filename,
-
                 prediction=predicted_disease,
-
                 confidence=confidence
             )
 
-            # --------------------------------------------------
+            # -------------------------------------------
             # SEND RESULT TO HTML
-            # --------------------------------------------------
+            # -------------------------------------------
 
             context = {
 
                 "image_url": image_url,
 
-                "message": "Image analyzed successfully!",
+                "message": (
+                    "Image analyzed successfully!"
+                ),
 
                 "prediction": predicted_disease,
 
@@ -450,15 +394,27 @@ def home(request):
                 "description": description
             }
 
-        except Exception as error:
+
+        except FileNotFoundError:
 
             context = {
 
                 "message": (
-                    "Error analyzing image: "
-                    + str(error)
+                    "AI model file not found. "
+                    "Please check skin_disease_model.keras."
                 )
             }
+
+
+        except Exception as e:
+
+            context = {
+
+                "message": (
+                    f"Error analyzing image: {str(e)}"
+                )
+            }
+
 
     return render(
         request,
@@ -467,9 +423,9 @@ def home(request):
     )
 
 
-# ==========================================================
+# =====================================================
 # PREDICTION HISTORY
-# ==========================================================
+# =====================================================
 
 @login_required(login_url="login")
 def prediction_history(request):
