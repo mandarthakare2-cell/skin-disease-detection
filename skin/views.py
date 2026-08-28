@@ -15,56 +15,43 @@ from .models import PredictionHistory
 
 
 # ==========================================
-# MODEL PATH
+# MODEL CONFIGURATION
 # ==========================================
 
 MODEL_PATH = os.path.join(
     settings.BASE_DIR,
-    "skin_disease_model.keras"
+    "skin",
+    "model",
+    "skin_disease_model.h5"
 )
-
-
-# ==========================================
-# LOAD MODEL ONLY WHEN NEEDED
-# ==========================================
 
 model = None
 
 
+# ==========================================
+# LOAD MODEL FUNCTION
+# ==========================================
+
 def get_model():
     global model
 
-    # Model is already loaded
-    if model is not None:
-        return model
+    if model is None:
 
-    # Check whether model file exists
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(
-            f"AI model file not found: {MODEL_PATH}"
-        )
+        if not os.path.exists(MODEL_PATH):
+            raise FileNotFoundError(
+                f"AI model file not found at: {MODEL_PATH}"
+            )
 
-    try:
-        # Load the trained model
         model = tf.keras.models.load_model(
             MODEL_PATH,
             compile=False
         )
 
-        return model
-
-    except Exception as error:
-
-        raise Exception(
-            f"Unable to load AI model: {str(error)}"
-        )
+    return model
 
 
 # ==========================================
 # CLASS NAMES
-# IMPORTANT:
-# These must be in the SAME ORDER used
-# while training your model.
 # ==========================================
 
 CLASS_NAMES = [
@@ -110,8 +97,8 @@ DISEASE_INFO = {
     ),
 
     "Ringworm": (
-        "Ringworm is a fungal skin infection that may "
-        "cause itchy or ring-shaped patches."
+        "Ringworm is a fungal skin infection that may cause "
+        "itchy or ring-shaped patches."
     ),
 
     "Vitiligo": (
@@ -144,7 +131,6 @@ def register_view(request):
             ""
         )
 
-        # Validate fields
         if not username or not email or not password:
 
             messages.error(
@@ -152,20 +138,17 @@ def register_view(request):
                 "Please fill in all fields."
             )
 
-        # Check username
         elif User.objects.filter(
             username=username
         ).exists():
 
             messages.error(
                 request,
-                "Username already exists. "
-                "Please choose another username."
+                "Username already exists. Please choose another username."
             )
 
         else:
 
-            # Create user
             User.objects.create_user(
                 username=username,
                 email=email,
@@ -174,8 +157,7 @@ def register_view(request):
 
             messages.success(
                 request,
-                "Registration successful. "
-                "Please login."
+                "Registration successful. Please login."
             )
 
             return redirect("login")
@@ -191,6 +173,9 @@ def register_view(request):
 # ==========================================
 
 def login_view(request):
+
+    if request.user.is_authenticated:
+        return redirect("home")
 
     if request.method == "POST":
 
@@ -210,7 +195,6 @@ def login_view(request):
             password=password
         )
 
-        # Successful login
         if user is not None:
 
             login(
@@ -253,19 +237,19 @@ def home(request):
 
     context = {}
 
-    # Only process when form is submitted
     if request.method == "POST":
 
-        uploaded_image = request.FILES.get(
-            "image"
-        )
+        uploaded_image = request.FILES.get("image")
 
-        # Check image
+        # ------------------------------
+        # CHECK IMAGE
+        # ------------------------------
+
         if not uploaded_image:
 
-            context = {
-                "message": "Please select an image first."
-            }
+            context["message"] = (
+                "Please select an image first."
+            )
 
             return render(
                 request,
@@ -273,148 +257,118 @@ def home(request):
                 context
             )
 
+        filename = None
+
         try:
 
-            # ======================================
-            # CREATE MEDIA DIRECTORY
-            # ======================================
+            # ------------------------------
+            # SAVE IMAGE
+            # ------------------------------
 
-            os.makedirs(
-                settings.MEDIA_ROOT,
-                exist_ok=True
-            )
-
-
-            # ======================================
-            # SAVE UPLOADED IMAGE
-            # ======================================
-
-            fs = FileSystemStorage(
-                location=settings.MEDIA_ROOT,
-                base_url=settings.MEDIA_URL
-            )
+            fs = FileSystemStorage()
 
             filename = fs.save(
                 uploaded_image.name,
                 uploaded_image
             )
 
-            image_url = fs.url(
-                filename
-            )
+            image_url = fs.url(filename)
 
-            image_path = fs.path(
-                filename
-            )
+            image_path = fs.path(filename)
 
-
-            # ======================================
-            # CHECK IMAGE EXISTS
-            # ======================================
-
-            if not os.path.exists(
-                image_path
-            ):
-
-                raise FileNotFoundError(
-                    f"Uploaded image not found: "
-                    f"{image_path}"
-                )
-
-
-            # ======================================
+            # ------------------------------
             # OPEN IMAGE
-            # ======================================
+            # ------------------------------
 
-            image = Image.open(
-                image_path
-            )
+            image = Image.open(image_path)
 
-            # Convert to RGB
-            image = image.convert(
-                "RGB"
-            )
+            image = image.convert("RGB")
 
-
-            # ======================================
+            # ------------------------------
             # RESIZE IMAGE
-            # ======================================
+            # ------------------------------
 
             image = image.resize(
                 (224, 224)
             )
 
-
-            # ======================================
-            # CONVERT IMAGE TO ARRAY
-            # ======================================
+            # ------------------------------
+            # CONVERT TO ARRAY
+            # ------------------------------
 
             image_array = np.array(
                 image,
                 dtype=np.float32
             )
 
+            # ------------------------------
+            # NORMALIZE IMAGE
+            # ------------------------------
 
-            # Normalize image
-            image_array = image_array / 255.0
+            image_array = (
+                image_array / 255.0
+            )
 
+            # ------------------------------
+            # ADD BATCH DIMENSION
+            # ------------------------------
 
-            # Add batch dimension
             image_array = np.expand_dims(
                 image_array,
                 axis=0
             )
 
-
-            # ======================================
+            # ------------------------------
             # LOAD AI MODEL
-            # ======================================
+            # ------------------------------
 
-            prediction_model = get_model()
+            ai_model = get_model()
 
+            # ------------------------------
+            # MAKE PREDICTION
+            # ------------------------------
 
-            # ======================================
-            # PREDICT DISEASE
-            # ======================================
-
-            predictions = prediction_model.predict(
+            predictions = ai_model.predict(
                 image_array,
                 verbose=0
             )
 
-
-            # Get highest probability index
             predicted_index = int(
                 np.argmax(
                     predictions[0]
                 )
             )
 
-
-            # Calculate confidence
             confidence = float(
                 np.max(
                     predictions[0]
                 ) * 100
             )
 
+            # ------------------------------
+            # GET DISEASE NAME
+            # ------------------------------
 
-            # Get disease name
-            predicted_disease = CLASS_NAMES[
-                predicted_index
-            ]
-
-
-            # Get description
-            description = DISEASE_INFO.get(
-                predicted_disease,
-                "No description available."
+            predicted_disease = (
+                CLASS_NAMES[
+                    predicted_index
+                ]
             )
 
+            # ------------------------------
+            # GET DESCRIPTION
+            # ------------------------------
 
-            # ======================================
-            # SAVE PREDICTION HISTORY
-            # ======================================
+            description = (
+                DISEASE_INFO.get(
+                    predicted_disease,
+                    "No description available."
+                )
+            )
+
+            # ------------------------------
+            # SAVE HISTORY
+            # ------------------------------
 
             PredictionHistory.objects.create(
                 user=request.user,
@@ -423,59 +377,60 @@ def home(request):
                 confidence=confidence
             )
 
-
-            # ======================================
+            # ------------------------------
             # SEND RESULT TO HTML
-            # ======================================
+            # ------------------------------
 
             context = {
 
                 "image_url": image_url,
 
-                "message":
-                    "Image analyzed successfully!",
+                "message": (
+                    "Image analyzed successfully!"
+                ),
 
-                "prediction":
-                    predicted_disease,
+                "prediction": (
+                    predicted_disease
+                ),
 
-                "confidence":
-                    round(
-                        confidence,
-                        2
-                    ),
+                "confidence": round(
+                    confidence,
+                    2
+                ),
 
-                "description":
+                "description": (
                     description
+                )
             }
-
-
-        # ==========================================
-        # MODEL OR IMAGE FILE NOT FOUND
-        # ==========================================
 
         except FileNotFoundError as error:
 
             context = {
 
-                "message":
-                    f"File error: {str(error)}"
+                "message": (
+                    "AI model file not found. "
+                    "Please check the model folder."
+                ),
+
+                "error": str(error)
             }
-
-
-        # ==========================================
-        # ANY OTHER ERROR
-        # ==========================================
 
         except Exception as error:
 
+            print(
+                "PREDICTION ERROR:",
+                str(error)
+            )
+
             context = {
 
-                "message":
-                    f"Error analyzing image: {str(error)}"
+                "message": (
+                    "Error analyzing image."
+                ),
+
+                "error": str(error)
             }
 
-
-    # Render page
     return render(
         request,
         "skin/home.html",
