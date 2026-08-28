@@ -1,0 +1,731 @@
+{% load tz %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Prediction History</title>
+
+    <style>
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+
+        body {
+            background: linear-gradient(
+                135deg,
+                #f1f5f9,
+                #e2e8f0
+            );
+
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        .header {
+
+            background: linear-gradient(
+                135deg,
+                #134e4a,
+                #0f766e
+            );
+
+            color: white;
+
+            padding: 20px 40px;
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+
+        .header h1 {
+
+            font-size: 26px;
+
+            font-weight: bold;
+        }
+
+
+        .back-btn {
+
+            text-decoration: none;
+
+            background: white;
+
+            color: #0f766e;
+
+            padding: 10px 20px;
+
+            border-radius: 8px;
+
+            font-weight: bold;
+
+            transition: 0.3s;
+        }
+
+
+        .back-btn:hover {
+
+            background: #d1fae5;
+
+            transform: translateY(-2px);
+        }
+
+
+        /* =========================
+           MAIN CONTAINER
+        ========================= */
+
+        .container {
+
+            width: 90%;
+
+            max-width: 1400px;
+
+            margin: 40px auto;
+        }
+
+
+        .page-title {
+
+            text-align: center;
+
+            margin-bottom: 10px;
+
+            font-size: 32px;
+
+            color: #134e4a;
+        }
+
+
+        .subtitle {
+
+            text-align: center;
+
+            margin-bottom: 40px;
+
+            color: #64748b;
+
+            font-size: 16px;
+        }
+
+
+        /* =========================
+           HISTORY GRID
+        ========================= */
+
+        .history-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(
+                    auto-fill,
+                    minmax(280px, 1fr)
+                );
+
+            gap: 25px;
+        }
+
+
+        /* =========================
+           HISTORY CARD
+        ========================= */
+
+        .history-card {
+
+            background: white;
+
+            border-radius: 18px;
+
+            overflow: hidden;
+
+            box-shadow:
+                0 8px 25px
+                rgba(0,0,0,0.12);
+
+            transition: 0.3s;
+        }
+
+
+        .history-card:hover {
+
+            transform: translateY(-8px);
+
+            box-shadow:
+                0 15px 35px
+                rgba(0,0,0,0.18);
+        }
+
+
+        /* =========================
+           IMAGE
+        ========================= */
+
+        .history-image {
+
+            width: 100%;
+
+            height: 230px;
+
+            object-fit: cover;
+
+            display: block;
+        }
+
+
+        /* =========================
+           CARD CONTENT
+        ========================= */
+
+        .card-content {
+
+            padding: 22px;
+        }
+
+
+        .disease-name {
+
+            color: #115e59;
+
+            font-size: 25px;
+
+            margin-bottom: 22px;
+
+            font-weight: bold;
+        }
+
+
+        /* =========================
+           INFO ROW
+        ========================= */
+
+        .info-row {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            padding: 13px 0;
+
+            border-bottom:
+                1px solid #e2e8f0;
+
+            font-size: 16px;
+        }
+
+
+        .info-label {
+
+            font-weight: bold;
+
+            color: #334155;
+        }
+
+
+        .info-value {
+
+            color: #475569;
+        }
+
+
+        /* =========================
+           CONFIDENCE
+        ========================= */
+
+        .confidence-section {
+
+            margin-top: 18px;
+        }
+
+
+        .confidence-row {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            margin-bottom: 10px;
+        }
+
+
+        .confidence-label {
+
+            font-weight: bold;
+
+            color: #334155;
+        }
+
+
+        .confidence-value {
+
+            font-weight: bold;
+
+            color: #0f766e;
+        }
+
+
+        .progress-container {
+
+            width: 100%;
+
+            height: 12px;
+
+            background: #e2e8f0;
+
+            border-radius: 20px;
+
+            overflow: hidden;
+        }
+
+
+        .progress-bar {
+
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #14b8a6,
+                    #0f766e
+                );
+
+            border-radius: 20px;
+        }
+
+
+        /* =========================
+           OK BUTTON
+        ========================= */
+
+        .button-container {
+
+            margin-top: 20px;
+
+            text-align: center;
+        }
+
+
+        .ok-button {
+
+            display: inline-block;
+
+            width: 100%;
+
+            padding: 11px;
+
+            border: none;
+
+            border-radius: 8px;
+
+            background: #0f766e;
+
+            color: white;
+
+            font-size: 16px;
+
+            font-weight: bold;
+
+            cursor: pointer;
+
+            transition: 0.3s;
+        }
+
+
+        .ok-button:hover {
+
+            background: #134e4a;
+
+            transform: translateY(-2px);
+        }
+
+
+        /* =========================
+           EMPTY HISTORY
+        ========================= */
+
+        .empty-history {
+
+            background: white;
+
+            padding: 60px 30px;
+
+            text-align: center;
+
+            border-radius: 18px;
+
+            box-shadow:
+                0 8px 25px
+                rgba(0,0,0,0.1);
+
+            grid-column: 1 / -1;
+        }
+
+
+        .empty-history h2 {
+
+            color: #134e4a;
+
+            margin-bottom: 15px;
+        }
+
+
+        .empty-history p {
+
+            color: #64748b;
+
+            margin-bottom: 25px;
+        }
+
+
+        .analyze-button {
+
+            display: inline-block;
+
+            text-decoration: none;
+
+            background: #0f766e;
+
+            color: white;
+
+            padding: 13px 25px;
+
+            border-radius: 8px;
+
+            font-weight: bold;
+        }
+
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media(max-width: 700px) {
+
+            .header {
+
+                padding: 15px 20px;
+
+                flex-direction: column;
+
+                gap: 15px;
+            }
+
+
+            .header h1 {
+
+                font-size: 22px;
+
+                text-align: center;
+            }
+
+
+            .container {
+
+                width: 92%;
+
+                margin: 25px auto;
+            }
+
+
+            .page-title {
+
+                font-size: 26px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =========================
+         HEADER
+    ========================== -->
+
+    <div class="header">
+
+        <h1>
+            🧠 Computer Vision Based Skin Disease Detection System
+        </h1>
+
+
+        <a href="{% url 'home' %}"
+           class="back-btn">
+
+            ← Back to Analysis
+
+        </a>
+
+    </div>
+
+
+
+    <!-- =========================
+         MAIN CONTENT
+    ========================== -->
+
+    <div class="container">
+
+
+        <h2 class="page-title">
+
+            📋 Prediction History
+
+        </h2>
+
+
+        <p class="subtitle">
+
+            View your previously analyzed skin images and predictions.
+
+        </p>
+
+
+
+        <!-- =========================
+             HISTORY GRID
+        ========================== -->
+
+        <div class="history-grid">
+
+
+            {% if history %}
+
+
+                {% for item in history %}
+
+
+                <!-- =========================
+                     HISTORY CARD
+                ========================== -->
+
+                <div class="history-card">
+
+
+                    <!-- IMAGE -->
+
+                    {% if item.image %}
+
+                    <img
+                        src="{{ item.image.url }}"
+                        alt="{{ item.prediction }}"
+                        class="history-image"
+                    >
+
+                    {% endif %}
+
+
+
+                    <div class="card-content">
+
+
+                        <!-- DISEASE NAME -->
+
+                        <h2 class="disease-name">
+
+                            {{ item.prediction }}
+
+                        </h2>
+
+
+
+                        <!-- DATE -->
+
+                        <div class="info-row">
+
+                            <span class="info-label">
+
+                                📅 Date
+
+                            </span>
+
+
+                            <span class="info-value">
+
+                                {{ item.created_at|localtime|date:"d M Y" }}
+
+                            </span>
+
+                        </div>
+
+
+
+                        <!-- TIME -->
+
+                        <div class="info-row">
+
+                            <span class="info-label">
+
+                                🕒 Time
+
+                            </span>
+
+
+                            <span class="info-value">
+
+                                {{ item.created_at|localtime|date:"h:i A" }}
+
+                            </span>
+
+                        </div>
+
+
+
+                        <!-- CONFIDENCE -->
+
+                        <div class="confidence-section">
+
+
+                            <div class="confidence-row">
+
+
+                                <span class="confidence-label">
+
+                                    📊 Confidence
+
+                                </span>
+
+
+                                <span class="confidence-value">
+
+                                    {{ item.confidence|floatformat:2 }}%
+
+                                </span>
+
+
+                            </div>
+
+
+
+                            <!-- PROGRESS BAR -->
+
+                            <div class="progress-container">
+
+
+                                <div
+                                    class="progress-bar"
+                                    style="
+                                        width:
+                                        {{ item.confidence }}%;
+                                    "
+                                >
+
+                                </div>
+
+
+                            </div>
+
+
+                        </div>
+
+
+
+                        <!-- OK BUTTON -->
+
+                        <div class="button-container">
+
+
+                            <a
+                                href="{% url 'home' %}"
+                                class="ok-button"
+                                style="
+                                    text-decoration: none;
+                                "
+                            >
+
+                                OK
+
+                            </a>
+
+
+                        </div>
+
+
+                    </div>
+
+
+                </div>
+
+
+                {% endfor %}
+
+
+
+            {% else %}
+
+
+                <!-- =========================
+                     EMPTY HISTORY
+                ========================== -->
+
+                <div class="empty-history">
+
+
+                    <h2>
+
+                        No Prediction History Found
+
+                    </h2>
+
+
+                    <p>
+
+                        You have not analyzed any skin images yet.
+
+                    </p>
+
+
+                    <a
+                        href="{% url 'home' %}"
+                        class="analyze-button"
+                    >
+
+                        Analyze an Image
+
+                    </a>
+
+
+                </div>
+
+
+            {% endif %}
+
+
+        </div>
+
+
+    </div>
+
+
+</body>
+
+
+</html>

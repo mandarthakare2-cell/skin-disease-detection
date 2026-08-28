@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Computer Vision Based Skin Disease Detection System
+    </title>
+
+
+    <style>
+
+        /* =====================================
+           GENERAL
+        ====================================== */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+
+        body {
+            min-height: 100vh;
+            background: #f4f7f9;
+            color: #222;
+        }
+
+
+        /* =====================================
+           HEADER
+        ====================================== */
+
+        header {
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #0f766e,
+                    #115e59
+                );
+
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+
+        }
+
+
+        header h1 {
+
+            font-size: 30px;
+            margin-bottom: 10px;
+
+        }
+
+
+        header p {
+
+            font-size: 16px;
+
+        }
+
+
+        .user-section {
+
+            margin-top: 18px;
+
+        }
+
+
+        .logout-link {
+
+            display: inline-block;
+            margin-left: 10px;
+            padding: 8px 15px;
+            color: white;
+            text-decoration: none;
+            border: 1px solid white;
+            border-radius: 6px;
+
+        }
+
+
+        .logout-link:hover {
+
+            background: white;
+            color: #0f766e;
+
+        }
+
+
+        /* =====================================
+           MAIN CONTAINER
+        ====================================== */
+
+        .container {
+
+            width: 90%;
+            max-width: 1000px;
+            margin: 40px auto;
+
+        }
+
+
+        /* =====================================
+           MAIN CARD
+        ====================================== */
+
+        .card {
+
+            background: white;
+            padding: 35px;
+            border-radius: 15px;
+
+            box-shadow:
+                0 5px 25px
+                rgba(0, 0, 0, 0.12);
+
+        }
+
+
+        .card h2 {
+
+            text-align: center;
+            color: #0f766e;
+            margin-bottom: 10px;
+
+        }
+
+
+        .subtitle {
+
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+
+        }
+
+
+        /* =====================================
+           UPLOAD AREA
+        ====================================== */
+
+        .upload-area {
+
+            border:
+                2px dashed #0f766e;
+
+            border-radius: 15px;
+            padding: 35px;
+            text-align: center;
+            background: #f0fdfa;
+
+        }
+
+
+        .upload-area p {
+
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #555;
+
+        }
+
+
+        /* =====================================
+           FILE INPUT
+        ====================================== */
+
+        input[type="file"] {
+
+            margin: 15px 0;
+            font-size: 15px;
+            max-width: 100%;
+
+        }
+
+
+        /* =====================================
+           ANALYZE BUTTON
+        ====================================== */
+
+        .analyze-btn {
+
+            margin-top: 20px;
+            padding: 14px 35px;
+
+            background: #0f766e;
+            color: white;
+
+            border: none;
+            border-radius: 8px;
+
+            font-size: 17px;
+            font-weight: bold;
+
+            cursor: pointer;
+            transition: 0.3s;
+
+        }
+
+
+        .analyze-btn:hover {
+
+            background: #115e59;
+
+        }
+
+
+        /* =====================================
+           HISTORY BUTTON
+        ====================================== */
+
+        .history-btn {
+
+            display: inline-block;
+
+            margin-top: 18px;
+            padding: 14px 25px;
+
+            background: #2563eb;
+            color: white;
+
+            text-decoration: none;
+
+            border-radius: 8px;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            transition: 0.3s;
+
+        }
+
+
+        .history-btn:hover {
+
+            background: #1d4ed8;
+
+        }
+
+
+        /* =====================================
+           IMAGE PREVIEW
+        ====================================== */
+
+        #previewContainer {
+
+            display: none;
+            margin-top: 25px;
+
+        }
+
+
+        #previewContainer h3 {
+
+            margin-bottom: 15px;
+            color: #333;
+
+        }
+
+
+        #imagePreview {
+
+            max-width: 350px;
+            max-height: 350px;
+
+            border-radius: 12px;
+
+            border:
+                3px solid #0f766e;
+
+        }
+
+
+        /* =====================================
+           RESULT SECTION
+        ====================================== */
+
+        .result-section {
+
+            margin-top: 35px;
+            padding: 25px;
+
+            background: #f0fdfa;
+
+            border-radius: 12px;
+
+            border-left:
+                6px solid #0f766e;
+
+        }
+
+
+        .result-section h2 {
+
+            text-align: left;
+            margin-bottom: 20px;
+
+        }
+
+
+        .result-box {
+
+            background: white;
+
+            padding: 18px;
+            margin-top: 15px;
+
+            border-radius: 8px;
+
+            box-shadow:
+                0 2px 8px
+                rgba(0, 0, 0, 0.08);
+
+        }
+
+
+        /* =====================================
+           UPLOADED IMAGE
+        ====================================== */
+
+        .uploaded-image {
+
+            max-width: 400px;
+            width: 100%;
+
+            border-radius: 12px;
+
+            margin-top: 15px;
+
+            border:
+                2px solid #0f766e;
+
+        }
+
+
+        /* =====================================
+           CONFIDENCE BAR
+        ====================================== */
+
+        .confidence-container {
+
+            margin-top: 12px;
+
+        }
+
+
+        .confidence-bar {
+
+            width: 100%;
+            height: 14px;
+
+            background: #ddd;
+
+            border-radius: 10px;
+            overflow: hidden;
+
+            margin-top: 10px;
+
+        }
+
+
+        .confidence-progress {
+
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #0f766e,
+                    #14b8a6
+                );
+
+            border-radius: 10px;
+
+        }
+
+
+        /* =====================================
+           FOOTER
+        ====================================== */
+
+        footer {
+
+            margin-top: 50px;
+            padding: 25px;
+
+            text-align: center;
+
+            background: #0f766e;
+            color: white;
+
+        }
+
+
+        footer p {
+
+            margin: 5px 0;
+
+        }
+
+
+        /* =====================================
+           MOBILE RESPONSIVE
+        ====================================== */
+
+        @media (max-width: 600px) {
+
+            header h1 {
+
+                font-size: 22px;
+
+            }
+
+
+            .container {
+
+                width: 95%;
+                margin: 20px auto;
+
+            }
+
+
+            .card {
+
+                padding: 20px;
+
+            }
+
+
+            #imagePreview {
+
+                width: 100%;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <!-- =====================================
+         HEADER
+    ====================================== -->
+
+    <header>
+
+        <h1>
+            Computer Vision Based Skin Disease Detection System
+        </h1>
+
+
+        <p>
+            AI Powered Skin Disease Image Analysis
+        </p>
+
+
+        {% if user.is_authenticated %}
+
+            <div class="user-section">
+
+                Welcome,
+                <strong>
+                    {{ user.username }}
+                </strong>
+
+                <a
+                    href="{% url 'logout' %}"
+                    class="logout-link"
+                >
+                    🚪 Logout
+                </a>
+
+            </div>
+
+        {% endif %}
+
+
+    </header>
+
+
+
+    <!-- =====================================
+         MAIN CONTENT
+    ====================================== -->
+
+    <div class="container">
+
+
+        <div class="card">
+
+
+            <h2>
+                Upload Skin Image
+            </h2>
+
+
+            <p class="subtitle">
+
+                Upload a clear skin image for
+                AI-based analysis.
+
+            </p>
+
+
+            <!-- =====================================
+                 UPLOAD FORM
+            ====================================== -->
+
+            <form
+                method="POST"
+                enctype="multipart/form-data"
+            >
+
+                {% csrf_token %}
+
+
+                <div class="upload-area">
+
+
+                    <p>
+
+                        Choose a clear image of the
+                        affected skin area.
+
+                    </p>
+
+
+                    <!-- FILE INPUT -->
+
+                    <input
+                        type="file"
+                        name="image"
+                        id="imageInput"
+                        accept="image/*"
+                        required
+                    >
+
+
+
+                    <!-- IMAGE PREVIEW -->
+
+                    <div id="previewContainer">
+
+                        <h3>
+                            Selected Image Preview
+                        </h3>
+
+
+                        <img
+                            id="imagePreview"
+                            src=""
+                            alt="Selected Skin Image"
+                        >
+
+                    </div>
+
+
+
+                    <br>
+
+
+
+                    <!-- ANALYZE BUTTON -->
+
+                    <button
+                        type="submit"
+                        class="analyze-btn"
+                    >
+
+                        🤖 Analyze Image
+
+                    </button>
+
+
+
+                    <br>
+
+
+
+                    <!-- HISTORY BUTTON -->
+
+                    <a
+                        href="{% url 'prediction_history' %}"
+                        class="history-btn"
+                    >
+
+                        📋 View Prediction History
+
+                    </a>
+
+
+                </div>
+
+
+            </form>
+
+
+
+            <!-- =====================================
+                 MESSAGE
+            ====================================== -->
+
+            {% if message %}
+
+                <div class="result-section">
+
+                    <h2>
+                        Analysis Status
+                    </h2>
+
+
+                    <div class="result-box">
+
+                        <p>
+                            {{ message }}
+                        </p>
+
+                    </div>
+
+
+                </div>
+
+            {% endif %}
+
+
+
+            <!-- =====================================
+                 UPLOADED IMAGE
+            ====================================== -->
+
+            {% if image_url %}
+
+                <div class="result-section">
+
+                    <h2>
+                        Uploaded Image
+                    </h2>
+
+
+                    <img
+                        src="{{ image_url }}"
+                        alt="Uploaded Skin Image"
+                        class="uploaded-image"
+                    >
+
+
+                </div>
+
+            {% endif %}
+
+
+
+            <!-- =====================================
+                 PREDICTION RESULT
+            ====================================== -->
+
+            {% if prediction %}
+
+                <div class="result-section">
+
+
+                    <h2>
+                        Skin Disease Analysis Result
+                    </h2>
+
+
+
+                    <!-- DISEASE -->
+
+                    <div class="result-box">
+
+                        <strong>
+                            🤖 Predicted Disease:
+                        </strong>
+
+
+                        <p>
+
+                            {{ prediction }}
+
+                        </p>
+
+                    </div>
+
+
+
+                    <!-- CONFIDENCE -->
+
+                    {% if confidence %}
+
+                        <div class="result-box">
+
+                            <strong>
+
+                                📊 Prediction Confidence:
+
+                            </strong>
+
+
+                            <p>
+
+                                {{ confidence }}%
+
+                            </p>
+
+
+                            <div class="confidence-container">
+
+                                <div class="confidence-bar">
+
+                                    <div
+                                        class="confidence-progress"
+
+                                        style="
+                                            width:
+                                            {{ confidence }}%;
+                                        "
+                                    >
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+
+                        </div>
+
+                    {% endif %}
+
+
+
+                    <!-- DESCRIPTION -->
+
+                    {% if description %}
+
+                        <div class="result-box">
+
+                            <strong>
+
+                                📋 Disease Information:
+
+                            </strong>
+
+
+                            <p>
+
+                                {{ description }}
+
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+
+                </div>
+
+            {% endif %}
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <!-- =====================================
+         FOOTER
+    ====================================== -->
+
+    <footer>
+
+        <p>
+
+            Computer Vision Based Skin Disease Detection System
+
+        </p>
+
+
+        <p>
+
+            Upload • Analyze • Predict
+
+        </p>
+
+
+    </footer>
+
+
+
+    <!-- =====================================
+         JAVASCRIPT IMAGE PREVIEW
+    ====================================== -->
+
+    <script>
+
+        const imageInput =
+            document.getElementById("imageInput");
+
+
+        const imagePreview =
+            document.getElementById("imagePreview");
+
+
+        const previewContainer =
+            document.getElementById("previewContainer");
+
+
+
+        imageInput.addEventListener(
+            "change",
+            function () {
+
+
+                const file =
+                    this.files[0];
+
+
+
+                if (file) {
+
+
+                    const reader =
+                        new FileReader();
+
+
+
+                    reader.onload =
+                        function (event) {
+
+
+                            imagePreview.src =
+                                event.target.result;
+
+
+                            previewContainer.style.display =
+                                "block";
+
+
+                        };
+
+
+
+                    reader.readAsDataURL(file);
+
+
+                }
+
+
+            }
+        );
+
+    </script>
+
+
+</body>
+
+</html>

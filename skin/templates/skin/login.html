@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Login - Skin Disease Detection</title>
+
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7f9;
+        }
+
+        .container {
+            width: 400px;
+            max-width: 90%;
+            margin: 100px auto;
+            background: white;
+            padding: 35px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        h1 {
+            text-align: center;
+            color: #0f766e;
+        }
+
+        p {
+            text-align: center;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 13px;
+            margin-top: 20px;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #115e59;
+        }
+
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f0fdfa;
+            border-radius: 6px;
+            color: #333;
+        }
+
+        a {
+            color: #0f766e;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+    <div class="container">
+
+
+        <h1>Login</h1>
+
+
+        <p>
+
+            Login to analyze your skin image.
+
+        </p>
+
+
+        {% if messages %}
+
+            {% for message in messages %}
+
+                <div class="message">
+
+                    {{ message }}
+
+                </div>
+
+            {% endfor %}
+
+        {% endif %}
+
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+
+            <input
+                type="text"
+                name="username"
+                placeholder="Enter Username"
+                required
+            >
+
+
+            <input
+                type="password"
+                name="password"
+                placeholder="Enter Password"
+                required
+            >
+
+
+            <button type="submit">
+
+                Login
+
+            </button>
+
+
+        </form>
+
+
+        <p style="margin-top: 20px;">
+
+            Don't have an account?
+
+            <a href="{% url 'register' %}">
+
+                Register
+
+            </a>
+
+        </p>
+
+
+    </div>
+
+
+</body>
+
+</html>
