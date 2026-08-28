@@ -1,6 +1,8 @@
 import os
+import gc
 import numpy as np
 from PIL import Image
+import tensorflow as tf
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.models import User
@@ -28,18 +30,17 @@ model = None
 
 def get_model():
     """
-    Load the AI model only when prediction is requested.
+    Load the AI model only once.
+    This helps reduce repeated memory usage.
     """
 
     global model
 
     if model is None:
 
-        import tensorflow as tf
-
         if not os.path.exists(MODEL_PATH):
             raise FileNotFoundError(
-                f"AI model file not found at: {MODEL_PATH}"
+                f"Model file not found: {MODEL_PATH}"
             )
 
         model = tf.keras.models.load_model(
@@ -71,40 +72,26 @@ CLASS_NAMES = [
 
 DISEASE_INFO = {
 
-    "Acne": (
-        "Acne is a common skin condition that can cause "
-        "pimples and inflamed areas."
-    ),
+    "Acne":
+        "Acne is a common skin condition that can cause pimples and inflamed areas.",
 
-    "Dermatitis": (
-        "Dermatitis is skin inflammation that may cause "
-        "itching, redness, dryness, or irritation."
-    ),
+    "Dermatitis":
+        "Dermatitis is skin inflammation that may cause itching, redness, dryness, or irritation.",
 
-    "Eczema": (
-        "Eczema may cause dry, itchy, inflamed, or "
-        "irritated skin."
-    ),
+    "Eczema":
+        "Eczema may cause dry, itchy, inflamed, or irritated skin.",
 
-    "Melanoma": (
-        "Melanoma is a serious skin condition. "
-        "This AI prediction is not a medical diagnosis."
-    ),
+    "Melanoma":
+        "Melanoma is a serious skin condition that requires professional medical evaluation.",
 
-    "Psoriasis": (
-        "Psoriasis may cause thickened or scaly patches "
-        "on the skin."
-    ),
+    "Psoriasis":
+        "Psoriasis may cause thickened or scaly patches on the skin.",
 
-    "Ringworm": (
-        "Ringworm is a fungal skin infection that may cause "
-        "itchy or ring-shaped patches."
-    ),
+    "Ringworm":
+        "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
 
-    "Vitiligo": (
-        "Vitiligo causes areas of skin to lose pigment, "
-        "resulting in lighter patches."
-    )
+    "Vitiligo":
+        "Vitiligo causes areas of skin to lose pigment, resulting in lighter patches."
 }
 
 
@@ -199,7 +186,9 @@ def login_view(request):
                 user
             )
 
-            return redirect("home")
+            return redirect(
+                "home"
+            )
 
         else:
 
@@ -220,9 +209,13 @@ def login_view(request):
 
 def logout_view(request):
 
-    logout(request)
+    logout(
+        request
+    )
 
-    return redirect("login")
+    return redirect(
+        "login"
+    )
 
 
 # ==================================================
@@ -242,9 +235,10 @@ def home(request):
 
         if not uploaded_image:
 
-            context["error"] = (
-                "Please select an image first."
-            )
+            context = {
+                "message":
+                    "Please select an image first."
+            }
 
             return render(
                 request,
@@ -254,9 +248,9 @@ def home(request):
 
         try:
 
-            # ------------------------------------------
-            # SAVE UPLOADED IMAGE
-            # ------------------------------------------
+            # ======================================
+            # SAVE IMAGE
+            # ======================================
 
             fs = FileSystemStorage()
 
@@ -274,9 +268,9 @@ def home(request):
             )
 
 
-            # ------------------------------------------
+            # ======================================
             # OPEN IMAGE
-            # ------------------------------------------
+            # ======================================
 
             image = Image.open(
                 image_path
@@ -291,9 +285,9 @@ def home(request):
             )
 
 
-            # ------------------------------------------
-            # PREPROCESS IMAGE
-            # ------------------------------------------
+            # ======================================
+            # CONVERT IMAGE TO ARRAY
+            # ======================================
 
             image_array = np.array(
                 image,
@@ -310,22 +304,21 @@ def home(request):
             )
 
 
-            # ------------------------------------------
+            # ======================================
             # LOAD MODEL
-            # ------------------------------------------
+            # ======================================
 
             ai_model = get_model()
 
 
-            # ------------------------------------------
-            # PREDICT
-            # ------------------------------------------
+            # ======================================
+            # PREDICTION
+            # ======================================
 
             predictions = ai_model.predict(
                 image_array,
                 verbose=0
             )
-
 
             predicted_index = int(
                 np.argmax(
@@ -333,48 +326,47 @@ def home(request):
                 )
             )
 
-
             confidence = float(
                 np.max(
                     predictions[0]
                 ) * 100
             )
 
+            predicted_disease = CLASS_NAMES[
+                predicted_index
+            ]
 
-            predicted_disease = (
-                CLASS_NAMES[
-                    predicted_index
-                ]
+            description = DISEASE_INFO.get(
+                predicted_disease,
+                "No description available."
             )
 
 
-            description = (
-                DISEASE_INFO.get(
-                    predicted_disease,
-                    "No description available."
-                )
-            )
-
-
-            # ------------------------------------------
+            # ======================================
             # SAVE HISTORY
-            # ------------------------------------------
+            # ======================================
 
             PredictionHistory.objects.create(
+
                 user=request.user,
+
                 image=filename,
+
                 prediction=predicted_disease,
+
                 confidence=confidence
+
             )
 
 
-            # ------------------------------------------
-            # SEND RESULT TO HTML
-            # ------------------------------------------
+            # ======================================
+            # RESULT
+            # ======================================
 
             context = {
 
-                "image_url": image_url,
+                "image_url":
+                    image_url,
 
                 "message":
                     "Image analyzed successfully!",
@@ -390,25 +382,34 @@ def home(request):
 
                 "description":
                     description
+
             }
+
+
+            # Clear temporary Python objects
+            del image_array
+            del predictions
+
+            gc.collect()
 
 
         except FileNotFoundError:
 
             context = {
 
-                "error":
-                    "AI model file not found. "
-                    "Please check skin_disease_model.keras."
+                "message":
+                    "AI model file not found. Please check skin_disease_model.keras."
+
             }
 
 
-        except Exception as e:
+        except Exception as error:
 
             context = {
 
-                "error":
-                    f"Unable to analyze image: {str(e)}"
+                "message":
+                    f"Unable to analyze image: {str(error)}"
+
             }
 
 
@@ -426,20 +427,21 @@ def home(request):
 @login_required(login_url="login")
 def prediction_history(request):
 
-    history = (
-        PredictionHistory.objects
-        .filter(
-            user=request.user
-        )
-        .order_by(
-            "-created_at"
-        )
+    history = PredictionHistory.objects.filter(
+        user=request.user
+    ).order_by(
+        "-created_at"
     )
 
     return render(
+
         request,
+
         "skin/history.html",
+
         {
-            "history": history
+            "history":
+                history
         }
+
     )
