@@ -391,11 +391,15 @@ def analytics_view(request):
         count=Count('id')
     ).order_by('login_date')
     
+    # Calculate average daily logins
+    avg_daily = recent_logins // 7 if recent_logins > 0 else 0
+    
     context = {
         'all_logins': all_logins[:50],  # Show last 50 logins
         'unique_users': unique_users,
         'total_logins': total_logins,
         'recent_logins': recent_logins,
+        'avg_daily': avg_daily,
         'login_by_user': login_by_user,
         'logins_by_date': list(logins_by_date),
     }
