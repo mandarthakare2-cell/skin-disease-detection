@@ -1,624 +1,403 @@
 import os
-
-# Set environment variables BEFORE importing TensorFlow
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
+import json
 import numpy as np
-import tensorflow as tf
-
 from PIL import Image
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import Count
+from datetime import timedelta
+from django.utils import timezone
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.models import User
-from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.core.files.storage import FileSystemStorage
 from django.conf import settings
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib import messages
 
-from .models import PredictionHistory
-
-
-# ==========================================================
-# PROJECT PATHS
-# ==========================================================
-
-BASE_DIR = settings.BASE_DIR
+from .models import PredictionHistory, LoginTracker
 
 
-MODEL_PATH = os.path.join(
-    BASE_DIR,
-    "skin_disease_model.keras"
-)
+# Global model variable
+model = None
 
-
-CLASS_NAMES_PATH = os.path.join(
-    BASE_DIR,
-    "class_names.txt"
-)
-
-
-# ==========================================================
-# LOAD CLASS NAMES
-# ==========================================================
-
-def load_class_names():
-
-    if not os.path.exists(
-        CLASS_NAMES_PATH
-    ):
-
-        return [
-            "Acne",
-            "Dermatitis",
-            "Eczema",
-            "Melanoma",
-            "Psoriasis",
-            "Ringworm",
-            "Vitiligo"
-        ]
-
-    with open(
-        CLASS_NAMES_PATH,
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        class_names = [
-
-            line.strip()
-
-            for line in file
-
-            if line.strip()
-
-        ]
-
-    return class_names
-
-
-# ==========================================================
-# DISEASE INFORMATION
-# ==========================================================
-
-DISEASE_INFO = {
-
-    "Acne":
-        "Acne is a skin condition that may cause pimples and inflamed areas.",
-
-    "Dermatitis":
-        "Dermatitis is skin inflammation that may cause redness, dryness, itching, or irritation.",
-
-    "Eczema":
-        "Eczema may cause dry, itchy, inflamed, or irritated skin.",
-
-    "Melanoma":
-        "Melanoma is a serious condition affecting skin cells.",
-
-    "Psoriasis":
-        "Psoriasis may cause thickened, dry, or scaly patches on the skin.",
-
-    "Ringworm":
-        "Ringworm is a fungal skin infection that may cause itchy or ring-shaped patches.",
-
-    "Vitiligo":
-        "Vitiligo causes areas of skin to lose pigment and become lighter."
+DISEASE_DESCRIPTIONS = {
+    "Acne": "Acne is a common skin condition caused by clogged pores, inflammation, and excess oil production.",
+    "Dermatitis": "Dermatitis is skin irritation or inflammation that can be triggered by allergens, irritants, or eczema-related factors.",
+    "Eczema": "Eczema is a chronic inflammatory skin condition causing dry, itchy, and red patches.",
+    "Melanoma": "Melanoma is a serious form of skin cancer that often appears as an unusual or changing mole.",
+    "Psoriasis": "Psoriasis is an autoimmune condition that leads to thick, scaly, red patches on the skin.",
+    "Ringworm": "Ringworm is a fungal infection that causes circular, itchy, raised patches on the skin.",
+    "Vitiligo": "Vitiligo causes loss of skin pigment, creating pale patches that may expand over time.",
 }
 
 
-# ==========================================================
-# MODEL VARIABLE
-# ==========================================================
+def get_client_ip(request):
+    """
+    Get client's IP address from request
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
-model = None
-
-
-# ==========================================================
-# LOAD MODEL ONLY WHEN NEEDED
-# ==========================================================
 
 def get_model():
+    """
+    Load the AI model only when an image is analyzed.
+    """
 
     global model
 
-    if model is None:
+    if model is not None:
+        return model
 
-        if not os.path.exists(
-            MODEL_PATH
-        ):
+    try:
+        import tensorflow as tf
 
+        model_candidates = [
+            os.path.join(settings.BASE_DIR, "skin", "model", "skin_disease_model.h5"),
+            os.path.join(settings.BASE_DIR, "skin", "model", "skin_disease_model.keras"),
+            os.path.join(settings.BASE_DIR, "skin_disease_model.h5"),
+            os.path.join(settings.BASE_DIR, "skin_disease_model.keras"),
+        ]
+
+        model_path = next((path for path in model_candidates if os.path.exists(path)), None)
+
+        if model_path is None:
             raise FileNotFoundError(
-                f"Model file not found: {MODEL_PATH}"
+                "Model file not found. Expected a .h5 or .keras model in the project root or skin/model folder."
             )
 
+        print(f"Loading AI model from {model_path}...")
+
         model = tf.keras.models.load_model(
-
-            MODEL_PATH,
-
+            model_path,
             compile=False
-
         )
 
-    return model
+        print("AI model loaded successfully!")
+
+        return model
+
+    except Exception as e:
+        print("MODEL ERROR:", str(e))
+        raise e
 
 
-# ==========================================================
-# REGISTER
-# ==========================================================
+def get_class_names():
+    class_file = os.path.join(settings.BASE_DIR, "class_names.txt")
+
+    if os.path.exists(class_file):
+        with open(class_file, "r", encoding="utf-8") as file:
+            class_names = [line.strip() for line in file.readlines() if line.strip()]
+        return class_names
+
+    return [f"Class {i}" for i in range(7)]
+
+
+# =========================
+# HOME PAGE
+# =========================
+
+@login_required
+def home(request):
+
+    context = {
+        "prediction": None,
+        "confidence": None,
+        "error": None,
+        "message": None,
+        "description": None,
+        "image_url": None,
+        "class_scores": [],
+        "low_confidence_warning": False,
+        "image_not_found": False,
+        "warning_type": None,
+        "warning_message": None,
+        "pie_chart_data": None,
+    }
+
+    if request.method == "POST":
+
+        if "image" not in request.FILES:
+
+            context["error"] = (
+                "Please select an image before clicking Analyze Image."
+            )
+            context["message"] = context["error"]
+
+            return render(
+                request,
+                "skin/home.html",
+                context
+            )
+
+        try:
+
+            uploaded_image = request.FILES["image"]
+
+            os.makedirs(
+                settings.MEDIA_ROOT,
+                exist_ok=True
+            )
+
+            image_path = os.path.join(
+                settings.MEDIA_ROOT,
+                uploaded_image.name
+            )
+
+            with open(
+                image_path,
+                "wb+"
+            ) as destination:
+
+                for chunk in uploaded_image.chunks():
+                    destination.write(chunk)
+
+            context["image_url"] = settings.MEDIA_URL + uploaded_image.name
+
+            ai_model = get_model()
+
+            image = Image.open(image_path).convert("RGB")
+            image = image.resize((224, 224))
+            image_array = np.array(image).astype("float32")
+            image_array = np.expand_dims(image_array, axis=0)
+
+            prediction_result = ai_model.predict(image_array, verbose=0)
+            predicted_index = int(np.argmax(prediction_result[0]))
+            confidence = float(np.max(prediction_result[0]) * 100)
+
+            class_names = get_class_names()
+
+            if predicted_index < len(class_names):
+                predicted_class = class_names[predicted_index]
+            else:
+                predicted_class = f"Class {predicted_index}"
+
+            class_scores = []
+            for idx, score in enumerate(prediction_result[0]):
+                label = class_names[idx] if idx < len(class_names) else f"Class {idx}"
+                class_scores.append({
+                    "label": label,
+                    "value": round(float(score * 100), 2),
+                    "is_predicted": idx == predicted_index,
+                })
+
+            ranked_scores = sorted(
+                class_scores,
+                key=lambda item: item["value"],
+                reverse=True
+            )
+
+            for rank, item in enumerate(ranked_scores, start=1):
+                item["rank"] = rank
+
+            context["prediction"] = predicted_class
+            context["confidence"] = round(confidence, 2)
+            context["class_scores"] = ranked_scores
+            
+            # Create pie chart data
+            pie_labels = [item["label"] for item in ranked_scores]
+            pie_values = [item["value"] for item in ranked_scores]
+            pie_colors = ["#3b82f6", "#14b8a6", "#0f766e", "#ec4899", "#f59e0b", "#10b981", "#8b5cf6"]
+            
+            context["pie_chart_data"] = json.dumps({
+                "labels": pie_labels,
+                "values": pie_values,
+                "colors": pie_colors[:len(pie_labels)]
+            })
+            
+            # Add warning for image not in dataset or low confidence
+            if confidence < 25:
+                context["image_not_found"] = True
+                context["warning_type"] = "error"
+                context["warning_message"] = "❌ Image Not Found in Dataset - The uploaded image does not match any disease in our training database. Please try another image."
+                context["low_confidence_warning"] = True
+            elif confidence < 40:
+                context["low_confidence_warning"] = True
+                context["warning_type"] = "warning"
+                context["warning_message"] = f"⚠️ Low Confidence Detected ({confidence}%) - The disease prediction has low confidence. Consider consulting with a dermatologist or uploading a clearer image."
+                context["image_not_found"] = False
+            else:
+                context["low_confidence_warning"] = False
+                context["image_not_found"] = False
+            
+            context["description"] = DISEASE_DESCRIPTIONS.get(
+                predicted_class,
+                "This result may require medical review from a dermatologist."
+            )
+
+            if request.user.is_authenticated:
+                with open(image_path, "rb") as image_file:
+                    image_content = image_file.read()
+                PredictionHistory.objects.create(
+                    user=request.user,
+                    image=SimpleUploadedFile(
+                        uploaded_image.name,
+                        image_content,
+                        content_type=uploaded_image.content_type or "image/jpeg"
+                    ),
+                    prediction=predicted_class,
+                    confidence=context["confidence"],
+                )
+
+        except FileNotFoundError as e:
+
+            context["error"] = (
+                f"Model file error: {str(e)}"
+            )
+            context["message"] = context["error"]
+
+        except Exception as e:
+
+            context["error"] = (
+                f"Error analyzing image: {str(e)}"
+            )
+            context["message"] = context["error"]
+
+    return render(
+        request,
+        "skin/home.html",
+        context
+    )
+
+
+# =========================
+# REGISTER USER
+# =========================
 
 def register_view(request):
 
     if request.method == "POST":
 
-        username = request.POST.get(
-            "username",
-            ""
-        ).strip()
+        username = request.POST.get("username")
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        confirm_password = request.POST.get("confirm_password")
 
-        email = request.POST.get(
-            "email",
-            ""
-        ).strip()
+        if not username or not password or not email:
+            messages.error(request, "Please fill all required fields.")
+            return redirect("register")
 
-        password = request.POST.get(
-            "password",
-            ""
+        if password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+            return redirect("register")
+
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Username already exists.")
+            return redirect("register")
+
+        User.objects.create_user(
+            username=username,
+            email=email,
+            password=password
         )
 
+        messages.success(request, "Registration successful. Please login.")
+        return redirect("login")
 
-        if not username or not email or not password:
-
-            messages.error(
-                request,
-                "Please fill in all fields."
-            )
+    return render(request, "skin/register.html")
 
 
-        elif User.objects.filter(
-            username=username
-        ).exists():
-
-            messages.error(
-                request,
-                "Username already exists. Please choose another username."
-            )
-
-
-        else:
-
-            User.objects.create_user(
-
-                username=username,
-
-                email=email,
-
-                password=password
-
-            )
-
-
-            messages.success(
-
-                request,
-
-                "Registration successful. Please login."
-
-            )
-
-
-            return redirect(
-                "login"
-            )
-
-
-    return render(
-
-        request,
-
-        "skin/register.html"
-
-    )
-
-
-# ==========================================================
-# LOGIN
-# ==========================================================
+# =========================
+# LOGIN USER
+# =========================
 
 def login_view(request):
 
+    if request.user.is_authenticated:
+        return redirect("home")
+
     if request.method == "POST":
 
-        username = request.POST.get(
-            "username",
-            ""
-        ).strip()
+        username = request.POST.get("username")
+        password = request.POST.get("password")
 
-        password = request.POST.get(
-            "password",
-            ""
-        )
-
-
-        user = authenticate(
-
-            request,
-
-            username=username,
-
-            password=password
-
-        )
-
+        user = authenticate(request, username=username, password=password)
 
         if user is not None:
-
-            login(
-
-                request,
-
-                user
-
+            login(request, user)
+            
+            # Track login
+            ip_address = get_client_ip(request)
+            LoginTracker.objects.create(
+                user=user,
+                ip_address=ip_address
             )
+            
+            messages.success(request, "Login successful.")
+            return redirect("home")
+
+        messages.error(request, "Invalid username or password.")
+        return redirect("login")
+
+    return render(request, "skin/login.html")
 
 
-            return redirect(
-                "home"
-            )
-
-
-        else:
-
-            messages.error(
-
-                request,
-
-                "Invalid username or password."
-
-            )
-
-
-    return render(
-
-        request,
-
-        "skin/login.html"
-
-    )
-
-
-# ==========================================================
-# LOGOUT
-# ==========================================================
+# =========================
+# LOGOUT USER
+# =========================
 
 def logout_view(request):
-
-    logout(
-        request
-    )
-
-
-    return redirect(
-        "login"
-    )
-
-
-# ==========================================================
-# HOME / PREDICTION
-# ==========================================================
-
-@login_required(
-    login_url="login"
-)
-def home(request):
-
-    context = {}
-
-
-    if request.method == "POST":
-
-        uploaded_image = request.FILES.get(
-            "image"
-        )
-
-
-        # ----------------------------------------------
-        # CHECK IMAGE
-        # ----------------------------------------------
-
-        if not uploaded_image:
-
-            context["message"] = (
-                "Please select an image first."
-            )
-
-
-            return render(
-
-                request,
-
-                "skin/home.html",
-
-                context
-
-            )
-
-
-        try:
-
-            # ------------------------------------------
-            # SAVE IMAGE
-            # ------------------------------------------
-
-            fs = FileSystemStorage()
-
-
-            filename = fs.save(
-
-                uploaded_image.name,
-
-                uploaded_image
-
-            )
-
-
-            image_url = fs.url(
-                filename
-            )
-
-
-            image_path = fs.path(
-                filename
-            )
-
-
-            # ------------------------------------------
-            # OPEN IMAGE
-            # ------------------------------------------
-
-            image = Image.open(
-                image_path
-            )
-
-
-            image = image.convert(
-                "RGB"
-            )
-
-
-            image = image.resize(
-                (224, 224)
-            )
-
-
-            # ------------------------------------------
-            # CONVERT IMAGE TO NUMPY ARRAY
-            # ------------------------------------------
-
-            image_array = np.array(
-
-                image,
-
-                dtype=np.float32
-
-            )
-
-
-            # ------------------------------------------
-            # IMPORTANT
-            #
-            # DO NOT DIVIDE BY 255 HERE.
-            #
-            # The trained model already contains:
-            #
-            # Rescaling(1.0 / 255.0)
-            #
-            # ------------------------------------------
-
-
-            # ------------------------------------------
-            # ADD BATCH DIMENSION
-            # ------------------------------------------
-
-            image_array = np.expand_dims(
-
-                image_array,
-
-                axis=0
-
-            )
-
-
-            # ------------------------------------------
-            # LOAD MODEL
-            # ------------------------------------------
-
-            loaded_model = get_model()
-
-
-            # ------------------------------------------
-            # PREDICT
-            # ------------------------------------------
-
-            predictions = loaded_model.predict(
-
-                image_array,
-
-                verbose=0
-
-            )
-
-
-            # ------------------------------------------
-            # GET CLASS NAMES
-            # ------------------------------------------
-
-            class_names = load_class_names()
-
-
-            # ------------------------------------------
-            # GET PREDICTED INDEX
-            # ------------------------------------------
-
-            predicted_index = int(
-
-                np.argmax(
-                    predictions[0]
-                )
-
-            )
-
-
-            # ------------------------------------------
-            # CONFIDENCE
-            # ------------------------------------------
-
-            confidence = float(
-
-                np.max(
-                    predictions[0]
-                ) * 100
-
-            )
-
-
-            # ------------------------------------------
-            # GET DISEASE
-            # ------------------------------------------
-
-            predicted_disease = class_names[
-                predicted_index
-            ]
-
-
-            # ------------------------------------------
-            # DESCRIPTION
-            # ------------------------------------------
-
-            description = DISEASE_INFO.get(
-
-                predicted_disease,
-
-                "No description available."
-
-            )
-
-
-            # ------------------------------------------
-            # SAVE HISTORY
-            # ------------------------------------------
-
-            PredictionHistory.objects.create(
-
-                user=request.user,
-
-                image=filename,
-
-                prediction=predicted_disease,
-
-                confidence=confidence
-
-            )
-
-
-            # ------------------------------------------
-            # SEND RESULT TO HTML
-            # ------------------------------------------
-
-            context = {
-
-                "image_url": image_url,
-
-                "message":
-                    "Image analyzed successfully!",
-
-                "prediction":
-                    predicted_disease,
-
-                "confidence":
-                    round(confidence, 2),
-
-                "description":
-                    description
-
-            }
-
-
-        # ----------------------------------------------
-        # MODEL NOT FOUND
-        # ----------------------------------------------
-
-        except FileNotFoundError as error:
-
-            context = {
-
-                "message":
-                    f"Model file error: {str(error)}"
-
-            }
-
-
-        # ----------------------------------------------
-        # OTHER ERROR
-        # ----------------------------------------------
-
-        except Exception as error:
-
-            print(
-                "ANALYSIS ERROR:",
-                str(error)
-            )
-
-
-            context = {
-
-                "message":
-                    f"Error analyzing image: {str(error)}"
-
-            }
-
-
-    return render(
-
-        request,
-
-        "skin/home.html",
-
-        context
-
-    )
-
-
-# ==========================================================
-# PREDICTION HISTORY
-# ==========================================================
-
-@login_required(
-    login_url="login"
-)
-def prediction_history(request):
-
-    history = PredictionHistory.objects.filter(
-
-        user=request.user
-
-    ).order_by(
-
-        "-created_at"
-
-    )
-
-
-    return render(
-
-        request,
-
-        "skin/history.html",
-
-        {
-
-            "history":
-                history
-
-        }
-
-    )
+    logout(request)
+    messages.info(request, "You have been logged out. Please login again.")
+    return redirect("login")
+
+
+# =========================
+# HISTORY PAGE
+# =========================
+
+@login_required
+def history_view(request):
+    history = PredictionHistory.objects.filter(user=request.user).order_by("-created_at")
+    return render(request, "skin/history.html", {"history": history})
+
+
+# =========================
+# LOGIN ANALYTICS PAGE
+# =========================
+
+def analytics_view(request):
+    """
+    Display login statistics and user activity
+    """
+    # Get all login records
+    all_logins = LoginTracker.objects.select_related('user').order_by('-login_time')
+    
+    # Get unique users who logged in
+    unique_users = LoginTracker.objects.values('user').distinct().count()
+    
+    # Get total login count
+    total_logins = LoginTracker.objects.count()
+    
+    # Get logins in the last 7 days
+    seven_days_ago = timezone.now() - timedelta(days=7)
+    recent_logins = LoginTracker.objects.filter(login_time__gte=seven_days_ago).count()
+    
+    # Get logins by user (most active users)
+    login_by_user = LoginTracker.objects.values('user__username').annotate(
+        login_count=Count('id')
+    ).order_by('-login_count')[:10]
+    
+    # Get logins by date (last 7 days)
+    logins_by_date = LoginTracker.objects.filter(
+        login_time__gte=seven_days_ago
+    ).extra(
+        select={'login_date': 'DATE(login_time)'}
+    ).values('login_date').annotate(
+        count=Count('id')
+    ).order_by('login_date')
+    
+    context = {
+        'all_logins': all_logins[:50],  # Show last 50 logins
+        'unique_users': unique_users,
+        'total_logins': total_logins,
+        'recent_logins': recent_logins,
+        'login_by_user': login_by_user,
+        'logins_by_date': list(logins_by_date),
+    }
+    
+    return render(request, 'skin/analytics.html', context)
