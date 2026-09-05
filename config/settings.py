@@ -19,7 +19,21 @@ DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
 
 
-ALLOWED_HOSTS = ['skin-disease-detection-l8iy.onrender.com', 'localhost', '127.0.0.1']
+# Allowed Hosts: allow specified hosts, wildcard .onrender.com, and RENDER_EXTERNAL_HOSTNAME
+allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts_env.split(",") if h.strip()]
+else:
+    ALLOWED_HOSTS = [
+        "localhost",
+        "127.0.0.1",
+        "testserver",
+        ".onrender.com",
+    ]
+
+render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
@@ -122,18 +136,13 @@ WSGI_APPLICATION = "config.wsgi.application"
 # DATABASE
 # ==========================================================
 
+import dj_database_url
+
 DATABASES = {
-
-    "default": {
-
-        "ENGINE":
-            "django.db.backends.sqlite3",
-
-        "NAME":
-            BASE_DIR / "db.sqlite3",
-
-    }
-
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 
@@ -295,11 +304,25 @@ LOGGING = APP_LOGGING_CONFIG
 # SECURITY SETTINGS
 # ==========================================================
 
-# Only set this in development! Change for production
-if DEBUG:
-    # Development settings
-    CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
-else:
+# Behind Render reverse proxy: tell Django to trust X-Forwarded-Proto header for HTTPS detection
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "https://*.onrender.com",
+]
+if render_hostname:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{render_hostname}")
+
+csrf_env = os.environ.get("CSRF_TRUSTED_ORIGINS")
+if csrf_env:
+    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in csrf_env.split(",") if origin.strip()])
+
+import sys
+IS_TESTING = "test" in sys.argv
+
+if not DEBUG and not IS_TESTING:
     # Production settings
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_SECURITY_POLICY = {
@@ -314,6 +337,10 @@ else:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 
 # ==========================================================

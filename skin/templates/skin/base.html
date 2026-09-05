@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Computer Vision Based Skin Disease Detection System{% endblock %}</title>
+  <meta name="description" content="AI-powered skin disease detection system with image analysis, prediction history, and analytics." />
+  <link rel="stylesheet" href="{% static 'skin/style.css' %}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="{% url 'home' %}" class="brand" aria-label="Home">
+        <span class="brand-mark">✦</span>
+        <span class="brand-text">Computer Vision Based Skin Disease Detection System</span>
+      </a>
+
+      <nav class="nav" aria-label="Main navigation">
+        <a href="{% url 'home' %}" class="{% if request.path == '/' %}active{% endif %}">Home</a>
+        <a href="{% url 'home' %}#analyze" class="{% if '#analyze' in request.get_full_path %}active{% endif %}">Analyze Skin</a>
+        <a href="{% url 'history' %}" class="{% if request.path == '/history/' %}active{% endif %}">History</a>
+        <a href="{% url 'analytics' %}" class="{% if request.path == '/analytics/' %}active{% endif %}">Analytics</a>
+        <a href="{% url 'about' %}" class="{% if request.path == '/about/' %}active{% endif %}">About</a>
+
+        {% if user.is_authenticated %}
+          <a href="{% url 'logout' %}" class="cta-link">Logout</a>
+        {% else %}
+          <a href="{% url 'login' %}" class="cta-link">Login</a>
+          <a href="{% url 'register' %}" class="cta-link">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% if messages %}
+    <div class="container" style="padding-top: 18px;">
+      {% for message in messages %}
+        <div class="notice {% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}good{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</body>
+</html>

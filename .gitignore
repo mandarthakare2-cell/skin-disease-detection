@@ -1,13 +1,25 @@
-# Ignore Python cache folders
-**/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
 
-# Ignore Python compiled files
-*.pyc
-*.pyo
+# Environment & Logs
+.env
+logs/*.log
+*.log
 
-# Ignore all Keras/H5 ML models
+# ML Models: Ignore large .h5 files (>100MB exceeds GitHub limit)
 *.h5
-*.keras
+skin/model/*.h5
 
-# Ignore the complete model folder
-skin/model/
+# Allow the compact .keras model for deployment (under GitHub 100MB limit)
+!skin/model/skin_disease_model.keras
+
+# Media files & uploads
+media/**
+!media/history_images/
+!media/history_images/.gitkeep
+
+
+

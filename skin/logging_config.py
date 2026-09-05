@@ -6,10 +6,11 @@ Provides comprehensive logging for debugging, monitoring, and audit trails
 import logging
 import logging.handlers
 import os
-from django.conf import settings
+from pathlib import Path
 
 # Create logs directory
-LOGS_DIR = os.path.join(settings.BASE_DIR, 'logs')
+BASE_DIR = Path(__file__).resolve().parent.parent
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Configure logging

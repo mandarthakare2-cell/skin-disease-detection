@@ -1,409 +1,72 @@
-{% load tz %}
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
-
-    <title>Prediction History</title>
-
-    <style>
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
-
-        body {
-            background: linear-gradient(
-                135deg,
-                #f1f5f9,
-                #e2e8f0
-            );
-
-            min-height: 100vh;
-            color: #1e293b;
-        }
-
-
-        /* =========================
-           HEADER
-        ========================= */
-
-        .header {
-
-            background: linear-gradient(
-                135deg,
-                #134e4a,
-                #0f766e
-            );
-
-            color: white;
-
-            padding: 20px 40px;
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        }
-
-
-        .header h1 {
-
-            font-size: 26px;
-
-            font-weight: bold;
-        }
-
-
-        .back-btn {
-
-            text-decoration: none;
-
-            background: white;
-
-            color: #0f766e;
-
-            padding: 10px 20px;
-
-            border-radius: 8px;
-
-            font-weight: bold;
-
-            transition: 0.3s;
-        }
-
-
-        .back-btn:hover {
-
-            background: #d1fae5;
-
-            transform: translateY(-2px);
-        }
-
-
-        /* =========================
-           MAIN CONTAINER
-        ========================= */
-
-        .container {
-
-            width: 90%;
-
-            max-width: 1400px;
-
-            margin: 40px auto;
-        }
-
-
-        .page-title {
-
-            text-align: center;
-
-            margin-bottom: 10px;
-
-            font-size: 32px;
-
-            color: #134e4a;
-        }
-
-
-        .subtitle {
-
-            text-align: center;
-
-            margin-bottom: 40px;
-
-            color: #64748b;
-
-            font-size: 16px;
-        }
-
-
-        /* =========================
-           HISTORY GRID
-        ========================= */
-
-        .history-grid {
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(
-                    auto-fill,
-                    minmax(280px, 1fr)
-                );
-
-            gap: 25px;
-        }
-
-
-        /* =========================
-           HISTORY CARD
-        ========================= */
-
-        .history-card {
-
-            background: white;
-
-            border-radius: 18px;
-
-            overflow: hidden;
-
-            box-shadow:
-                0 8px 25px
-                rgba(0,0,0,0.12);
-
-            transition: 0.3s;
-        }
-
-
-        .history-card:hover {
-
-            transform: translateY(-8px);
-
-            box-shadow:
-                0 15px 35px
-                rgba(0,0,0,0.18);
-        }
-
-
-        /* =========================
-           IMAGE
-        ========================= */
-
-        .history-image {
-
-            width: 100%;
-
-            height: 230px;
-
-            object-fit: cover;
-
-            display: block;
-        }
-
-
-        /* =========================
-           CARD CONTENT
-        ========================= */
-
-        .card-content {
-
-            padding: 22px;
-        }
-
-
-        .disease-name {
-
-            color: #115e59;
-
-            font-size: 25px;
-
-            margin-bottom: 22px;
-
-            font-weight: bold;
-        }
-
-
-        /* =========================
-           INFO ROW
-        ========================= */
-
-        .info-row {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
-
-            padding: 13px 0;
-
-            border-bottom:
-                1px solid #e2e8f0;
-
-            font-size: 16px;
-        }
-
-
-        .info-label {
-
-            font-weight: bold;
-
-            color: #334155;
-        }
-
-
-        .info-value {
-
-            color: #475569;
-        }
-
-
-        /* =========================
-           CONFIDENCE
-        ========================= */
-
-        .confidence-section {
-
-            margin-top: 18px;
-        }
-
-
-        .confidence-row {
-
-            display: flex;
-
-            justify-content: space-between;
-
-            margin-bottom: 10px;
-        }
-
-
-        .confidence-label {
-
-            font-weight: bold;
-
-            color: #334155;
-        }
-
-
-        .confidence-value {
-
-            font-weight: bold;
-
-            color: #0f766e;
-        }
-
-
-        .progress-container {
-
-            width: 100%;
-
-            height: 12px;
-
-            background: #e2e8f0;
-
-            border-radius: 20px;
-
-            overflow: hidden;
-        }
-
-
-        .progress-bar {
-
-            height: 100%;
-
-            background:
-                linear-gradient(
-                    90deg,
-                    #14b8a6,
-                    #0f766e
-                );
-
-            border-radius: 20px;
-        }
-
-
-        /* =========================
-           OK BUTTON
-        ========================= */
-
-        .button-container {
-
-            margin-top: 20px;
-
-            text-align: center;
-        }
-
-
-        .ok-button {
-
-            display: inline-block;
-
-            width: 100%;
-
-            padding: 11px;
-
-            border: none;
-
-            border-radius: 8px;
-
-            background: #0f766e;
-
-            color: white;
-
-            font-size: 16px;
-
-            font-weight: bold;
-
-            cursor: pointer;
-
-            transition: 0.3s;
-        }
-
-
-        .ok-button:hover {
-
-            background: #134e4a;
-
-            transform: translateY(-2px);
-        }
-
-
-        /* =========================
-           EMPTY HISTORY
-        ========================= */
-
-        .empty-history {
-
-            background: white;
-
-            padding: 60px 30px;
-
-            text-align: center;
-
-            border-radius: 18px;
-
-            box-shadow:
-                0 8px 25px
-                rgba(0,0,0,0.1);
-
-            grid-column: 1 / -1;
-        }
-
-
-        .empty-history h2 {
-
-            color: #134e4a;
-
-            margin-bottom: 15px;
-        }
-
-
-        .empty-history p {
-
-            color: #64748b;
-
-            margin-bottom: 25px;
-        }
-
-
-        .analyze-button {
-
-            display: inline-block;
+{% extends 'skin/base.html' %}
+
+{% block title %}Prediction History - Computer Vision Based Skin Disease Detection System{% endblock %}
+
+{% block content %}
+<section class="page-shell">
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1>Prediction History</h1>
+        <p>Your private analysis records and image history.</p>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <form method="get" style="display:flex; gap:12px; flex-wrap:wrap; width:100%; align-items:center;">
+        <input class="search" type="text" name="q" value="{{ search_query }}" placeholder="Search by disease or date" />
+
+        <select name="disease">
+          <option value="">All diseases</option>
+          {% for disease in disease_options %}
+            <option value="{{ disease }}" {% if disease_filter == disease %}selected{% endif %}>{{ disease }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="sort">
+          <option value="-created_at" {% if sort_by == '-created_at' %}selected{% endif %}>Newest first</option>
+          <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Oldest first</option>
+          <option value="-confidence" {% if sort_by == '-confidence' %}selected{% endif %}>Highest confidence</option>
+          <option value="confidence" {% if sort_by == 'confidence' %}selected{% endif %}>Lowest confidence</option>
+          <option value="prediction" {% if sort_by == 'prediction' %}selected{% endif %}>Disease name</option>
+        </select>
+
+        <button class="primary-btn" type="submit">Apply</button>
+      </form>
+    </div>
+
+    {% if history %}
+      <div class="history-grid">
+        {% for item in history %}
+          <article class="history-card">
+            {% if item.image %}
+              <img src="{{ item.image.url }}" alt="Prediction for {{ item.prediction }}" />
+            {% else %}
+              <div style="height:220px; background:linear-gradient(135deg,#edf6ff,#e2f0ff); display:grid; place-items:center; color:var(--muted);">No image</div>
+            {% endif %}
+
+            <div class="history-content">
+              <h3>{{ item.prediction }}</h3>
+              <div class="meta-row"><span>Confidence</span><strong>{{ item.confidence }}%</strong></div>
+              <div class="meta-row"><span>Date</span><strong>{{ item.created_at|date:'Y-m-d H:i' }}</strong></div>
+              <div class="card-actions">
+                <form method="post" action="{% url 'delete_history' item.id %}">
+                  {% csrf_token %}
+                  <button class="danger-btn" type="submit" onclick="return confirm('Delete this record?');">Delete</button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        {{ empty_message|default:"No data found for the selected filter." }}
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
 
             text-decoration: none;
 
@@ -570,7 +233,7 @@
 
                             <span class="info-value">
 
-                                {{ item.created_at|localtime|date:"d M Y" }}
+                                {{ item.created_at|date:"d M Y" }}
 
                             </span>
 
@@ -591,7 +254,7 @@
 
                             <span class="info-value">
 
-                                {{ item.created_at|localtime|date:"h:i A" }}
+                                {{ item.created_at|date:"h:i A" }}
 
                             </span>
 

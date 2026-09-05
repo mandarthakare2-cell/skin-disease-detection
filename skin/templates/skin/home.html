@@ -1,478 +1,289 @@
-{% load static %}
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Computer Vision Based Skin Disease Detection System</title>
-
-    <style>
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
-
-        body {
-            background: #f4f8f7;
-            color: #1f2937;
-        }
-
-        /* ================= HEADER ================= */
-
-        header {
-            background: linear-gradient(135deg, #0f766e, #134e4a);
-            color: white;
-            padding: 20px 8%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        header h1 {
-            font-size: 25px;
-            max-width: 650px;
-        }
-
-        nav {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            padding: 10px 16px;
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 8px;
-            transition: 0.3s;
-        }
-
-        nav a:hover {
-            background: white;
-            color: #0f766e;
-        }
-
-        /* ================= MAIN ================= */
-
-        .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 20px;
-        }
-
-        .welcome {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .welcome h2 {
-            color: #134e4a;
-            margin-bottom: 10px;
-        }
-
-        .welcome p {
-            color: #6b7280;
-        }
-
-        /* ================= UPLOAD CARD ================= */
-
-        .upload-card {
-            background: white;
-            padding: 35px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-            margin-bottom: 30px;
-        }
-
-        .upload-card h2 {
-            color: #134e4a;
-            margin-bottom: 20px;
-        }
-
-        .upload-area {
-            border: 2px dashed #0f766e;
-            padding: 40px 20px;
-            text-align: center;
-            border-radius: 12px;
-            background: #f0fdfa;
-        }
-
-        .upload-area input {
-            margin-top: 15px;
-            font-size: 16px;
-        }
-
-        .analyze-btn {
-            margin-top: 25px;
-            background: #0f766e;
-            color: white;
-            border: none;
-            padding: 14px 30px;
-            font-size: 17px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .analyze-btn:hover {
-            background: #115e59;
-        }
-
-        /* ================= MESSAGE ================= */
-
-        .message {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            background: #ecfdf5;
-            color: #065f46;
-            font-weight: bold;
-        }
-
-        /* ================= RESULT ================= */
-
-        .result-section {
-            background: white;
-            padding: 35px;
-            border-radius: 15px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-        }
-
-        .result-section h2 {
-            color: #134e4a;
-            margin-bottom: 25px;
-        }
-
-        .result-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        .image-box {
-            text-align: center;
-        }
-
-        .image-box img {
-            width: 100%;
-            max-width: 400px;
-            border-radius: 12px;
-            border: 2px solid #e5e7eb;
-        }
-
-        .details-box {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .detail-card {
-            background: #f0fdfa;
-            padding: 18px;
-            border-radius: 10px;
-            border-left: 5px solid #0f766e;
-        }
-
-        .detail-card h3 {
-            color: #134e4a;
-            margin-bottom: 8px;
-        }
-
-        .prediction {
-            font-size: 24px;
-            font-weight: bold;
-            color: #0f766e;
-        }
-
-        .confidence {
-            font-size: 22px;
-            font-weight: bold;
-            color: #2563eb;
-        }
-
-        /* ================= FOOTER ================= */
-
-        footer {
-            text-align: center;
-            padding: 25px;
-            margin-top: 40px;
-            background: #134e4a;
-            color: white;
-        }
-
-        /* ================= MOBILE ================= */
-
-        @media (max-width: 768px) {
-
-            header {
-                justify-content: center;
-                text-align: center;
-            }
-
-            header h1 {
-                font-size: 20px;
-            }
-
-            nav {
-                justify-content: center;
-            }
-
-            .result-grid {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
-    </style>
-
-</head>
-
-
-<body>
-
-
-<!-- ================= HEADER ================= -->
-
-<header>
-
-    <h1>
-        Computer Vision Based Skin Disease Detection System
-    </h1>
-
-    <nav>
-
-        <a href="{% url 'home' %}">
-            Home
-        </a>
-
-        <a href="{% url 'history' %}">
-            Prediction History
-        </a>
-
-        <a href="{% url 'logout' %}">
-            Logout
-        </a>
-
-    </nav>
-
-</header>
-
-
-
-<!-- ================= MAIN CONTENT ================= -->
-
-<div class="container">
-
-
-    <!-- ================= WELCOME ================= -->
-
-    <div class="welcome">
-
-        <h2>
-            Skin Disease Image Analysis
-        </h2>
-
-        <p>
-            Upload a skin image and analyze it using the trained AI model.
-        </p>
-
+{% extends 'skin/base.html' %}
+
+{% block title %}Home - Computer Vision Based Skin Disease Detection System{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="eyebrow">Computer Vision Based Skin Disease Detection System</span>
+      <h1>Computer Vision Based Skin Disease Detection System</h1>
+      <p>Upload a skin image and receive a quick AI-based assessment designed to help users identify potential skin conditions and understand follow-up steps.</p>
+      <div class="hero-actions">
+        <a href="#analyze" class="primary-btn">Analyze Your Skin Image</a>
+        <a href="{% url 'about' %}" class="secondary-btn">Learn More</a>
+      </div>
+
+      <div class="hero-metrics">
+        <div class="metric-box">
+          <strong>7</strong>
+          <span>Supported classes</span>
+        </div>
+        <div class="metric-box">
+          <strong>24/7</strong>
+          <span>Image review access</span>
+        </div>
+        <div class="metric-box">
+          <strong>AI</strong>
+          <span>Clinical assistance</span>
+        </div>
+      </div>
     </div>
 
-
-
-    <!-- ================= IMAGE UPLOAD ================= -->
-
-    <div class="upload-card">
-
-        <h2>
-            Upload Skin Image
-        </h2>
-
-
-        <form method="POST" enctype="multipart/form-data">
-
-            {% csrf_token %}
-
-
-            <div class="upload-area">
-
-                <h3>
-                    Select an image for analysis
-                </h3>
-
-                <input
-                    type="file"
-                    name="image"
-                    accept="image/*"
-                    required
-                >
-
-            </div>
-
-
-            <center>
-
-                <button
-                    type="submit"
-                    class="analyze-btn"
-                >
-
-                    Analyze Image
-
-                </button>
-
-            </center>
-
-
-        </form>
-
-
-        {% if message %}
-
-            <div class="message">
-
-                {{ message }}
-
-            </div>
-
-        {% endif %}
-
-
-    </div>
-
-
-
-    <!-- ================= RESULT SECTION ================= -->
-
-    {% if prediction %}
-
-    <div class="result-section">
-
-        <h2>
-            Analysis Result
-        </h2>
-
-
-        <div class="result-grid">
-
-
-            <!-- IMAGE -->
-
-            <div class="image-box">
-
-                <h3>
-                    Uploaded Image
-                </h3>
-
-                <br>
-
-                {% if image_url %}
-
-                    <img
-                        src="{{ image_url }}"
-                        alt="Uploaded Skin Image"
-                    >
-
-                {% endif %}
-
-            </div>
-
-
-
-            <!-- DETAILS -->
-
-            <div class="details-box">
-
-
-                <!-- PREDICTION -->
-
-                <div class="detail-card">
-
-                    <h3>
-                        Predicted Disease
-                    </h3>
-
-                    <p class="prediction">
-
-                        {{ prediction }}
-
-                    </p>
-
-                </div>
-
-
-
-                <!-- CONFIDENCE -->
-
-                <div class="detail-card">
-
-                    <h3>
-                        AI Confidence
-                    </h3>
-
-                    <p class="confidence">
-
-                        {{ confidence }}%
-
-                    </p>
-
-                </div>
-
-
-
-                <!-- DESCRIPTION -->
-
-                <div class="detail-card">
-
-                    <h3>
-                        Disease Description
-                    </h3>
-
-                    <p>
-
-                        {{ description }}
-
-                    </p>
-
-                </div>
-
-
-            </div>
-
-
+    <div class="hero-panel">
+      <div class="mini-window">
+        <div class="mini-header">
+          <span>Live model status</span>
+          <span class="status-pill">Ready</span>
         </div>
 
+        <div class="analysis-card">
+          <h3>Latest analysis</h3>
+          <div class="analysis-row">
+            <span>Detected condition</span>
+            <strong>{% if prediction %}{{ prediction }}{% else %}Pending{% endif %}</strong>
+          </div>
+          <div class="analysis-row">
+            <span>Confidence</span>
+            <strong>{% if confidence %}{{ confidence }}%{% else %}--{% endif %}</strong>
+          </div>
+          <div class="progress">
+            <div class="progress-bar" style="width: {% if confidence %}{{ confidence }}%{% else %}72%{% endif %};"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Key Features</h2>
+      <p>Professional AI workflows built for skin analysis and tracking.</p>
     </div>
 
+    <div class="features-grid">
+      <article class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3>AI Disease Detection</h3>
+        <p>Detect possible skin conditions from uploaded images using a trained computer vision model.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon">📷</div>
+        <h3>Image Analysis</h3>
+        <p>Process and evaluate high-resolution uploaded images before classifying the likely condition.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Prediction Confidence</h3>
+        <p>View confidence scores and per-class probability rankings to understand model certainty.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Personalized Precautions</h3>
+        <p>Receive symptom and precaution guidance relevant to the predicted class to encourage safe review.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon">🗂️</div>
+        <h3>Prediction History</h3>
+        <p>Save and review previous skin analyses tied to your authenticated account history.</p>
+      </article>
+      <article class="feature-card">
+        <div class="feature-icon">📈</div>
+        <h3>Analytics Dashboard</h3>
+        <p>Track trends, recent activity, average confidence, and the most common predicted disease classes.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2>How It Works</h2>
+    </div>
+
+    <div class="steps-grid">
+      <article class="step-card">
+        <div class="step-number">1</div>
+        <h3>Upload Image</h3>
+        <p>Select a clear photograph of the skin area you want to review.</p>
+      </article>
+      <article class="step-card">
+        <div class="step-number">2</div>
+        <h3>AI Analysis</h3>
+        <p>Our model preprocesses the image and scores the possible disease classes.</p>
+      </article>
+      <article class="step-card">
+        <div class="step-number">3</div>
+        <h3>Disease Prediction</h3>
+        <p>Review the predicted disease label and the associated confidence score.</p>
+      </article>
+      <article class="step-card">
+        <div class="step-number">4</div>
+        <h3>View Results</h3>
+        <p>Check symptoms, precautions, and professional advice to guide next steps.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section analyze-section" id="analyze">
+  <div class="container">
+    <div class="section-header">
+      <h2>Analyze Your Skin Image</h2>
+    </div>
+
+    <div class="panel">
+      <form method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+        {% csrf_token %}
+
+        <div class="dropzone" id="dropzone">
+          <img class="image-preview" id="imagePreview" alt="Selected preview" />
+          <div class="dropzone-content">
+            <div class="dropzone-icon">📤</div>
+            <h3>Drag and drop your image here</h3>
+            <p>or</p>
+            <label for="imageInput" class="inline-button">Browse image</label>
+            <small>Supported formats: JPG, PNG, WebP • Max size: 5MB</small>
+            <input id="imageInput" name="image" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="file-meta" id="fileMeta">No file selected</div>
+          <div class="loading-indicator" id="loadingIndicator">
+            <span class="spinner"></span>
+            <span>Analyzing image...</span>
+          </div>
+          <button class="primary-btn" type="submit">Analyze Image</button>
+        </div>
+      </form>
+    </div>
+
+    {% if message or error %}
+      <div class="notice {% if error %}error{% else %}good{% endif %}" style="margin-top: 22px;">
+        {{ message|default:error }}
+      </div>
     {% endif %}
 
+    {% if prediction %}
+      <div class="result-grid" style="margin-top: 28px;">
+        <div class="result-image-wrap">
+          <img src="{{ image_url }}" alt="Uploaded skin analysis image" />
+        </div>
 
-</div>
+        <div class="result-summary">
+          <div class="prediction-badge">Predicted disease</div>
+          <p class="prediction-value">{{ prediction }}</p>
+          <div class="confidence-pill">Confidence: {{ confidence }}%</div>
 
+          <div class="progress-wrap">
+            <div class="muted">Prediction Confidence</div>
+            <div class="progress">
+              <div class="progress-bar" style="width: {{ confidence }}%;"></div>
+            </div>
+          </div>
 
+        </div>
+      </div>
 
-<!-- ================= FOOTER ================= -->
+      <div class="result-grid" style="margin-top: 24px;">
+        <div class="result-card">
+          <h3>Disease description</h3>
+          <p class="muted">{{ description }}</p>
+        </div>
 
-<footer>
+        <div class="result-card">
+          <h3>Common symptoms</h3>
+          <ul class="result-list">
+            {% for item in symptoms %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
 
-    <p>
-        Computer Vision Based Skin Disease Detection System
-    </p>
+        <div class="result-card">
+          <h3>General precautions</h3>
+          <ul class="result-list">
+            {% for item in precautions %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </div>
 
-</footer>
+        <div class="result-card">
+          <h3>When to seek professional care</h3>
+          <p class="muted">{{ medical_advice }}</p>
+        </div>
+      </div>
 
+      {% if class_scores %}
+        <div class="result-card" style="margin-top: 24px;">
+          <h3>Prediction ranking</h3>
+          <ul class="result-list">
+            {% for item in class_scores %}
+              <li>{{ item.label }}: {{ item.value }}%</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
 
-</body>
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const input = document.getElementById('imageInput');
+  const preview = document.getElementById('imagePreview');
+  const fileMeta = document.getElementById('fileMeta');
+  const form = document.getElementById('uploadForm');
+  const loadingIndicator = document.getElementById('loadingIndicator');
 
-</html>
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'));
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'));
+  });
+
+  dropzone.addEventListener('click', (event) => {
+    if (event.target.closest('button, label')) return;
+    input.click();
+  });
+
+  dropzone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files && files.length) {
+      input.files = files;
+      updateFileMeta(files[0]);
+    }
+  });
+
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length) {
+      updateFileMeta(input.files[0]);
+    }
+  });
+
+  form.addEventListener('submit', () => {
+    loadingIndicator.classList.add('visible');
+  });
+
+  function updateFileMeta(file) {
+    fileMeta.textContent = file.name + ' • ' + (file.size / 1024 / 1024).toFixed(2) + ' MB';
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        preview.src = e.target.result;
+        preview.classList.add('visible');
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+</script>
+{% endblock %}

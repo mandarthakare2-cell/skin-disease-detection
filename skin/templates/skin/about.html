@@ -1,0 +1,41 @@
+{% extends 'skin/base.html' %}
+
+{% block title %}About - Computer Vision Based Skin Disease Detection System{% endblock %}
+
+{% block content %}
+<section class="page-shell">
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1>About the System</h1>
+        <p>Computer vision-based skin analysis designed to support early awareness and clinical review.</p>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <article class="info-card">
+        <div class="feature-icon">🧠</div>
+        <h3>CV-Based Detection</h3>
+        <p>The system analyzes uploaded skin images using a trained computer vision model to provide a preliminary disease prediction.</p>
+      </article>
+
+      <article class="info-card">
+        <div class="feature-icon">📸</div>
+        <h3>Image-Based Review</h3>
+        <p>Users can upload JPG, PNG, or WebP skin images and view both the computer vision prediction and relevant contextual information.</p>
+      </article>
+
+      <article class="info-card">
+        <div class="feature-icon">⚕️</div>
+        <h3>Clinical Awareness</h3>
+        <p>Predictions are meant for educational information and should be reviewed by a qualified healthcare professional.</p>
+      </article>
+    </div>
+
+    <div class="panel" style="margin-top:24px;">
+      <h3 style="margin-top:0; color: var(--primary-dark);">How the project helps</h3>
+      <p class="muted">This application supports skin health monitoring by helping users record image history, review computer vision-based predictions, and understand the general importance of confidence, symptoms, and professional check-ups.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

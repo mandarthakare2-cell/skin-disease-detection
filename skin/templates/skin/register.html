@@ -1,170 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'skin/base.html' %}
 
-<head>
+{% block title %}Register - Computer Vision Based Skin Disease Detection System{% endblock %}
 
-    <meta charset="UTF-8">
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-card">
+    <h1>Create Account</h1>
+    <p class="subtitle">Register to save your prediction history and access advanced analytics.</p>
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <form method="post" novalidate>
+      {% csrf_token %}
 
-    <title>Register - Skin Disease Detection</title>
-
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f7f9;
-        }
-
-        .container {
-            width: 400px;
-            max-width: 90%;
-            margin: 80px auto;
-            background: white;
-            padding: 35px;
-            border-radius: 15px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        h1 {
-            text-align: center;
-            color: #0f766e;
-        }
-
-        p {
-            text-align: center;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px;
-            margin-top: 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-
-        button {
-            width: 100%;
-            padding: 13px;
-            margin-top: 20px;
-            background: #0f766e;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #115e59;
-        }
-
-        .message {
-            padding: 10px;
-            margin: 10px 0;
-            background: #f0fdfa;
-            border-radius: 6px;
-            color: #333;
-        }
-
-        a {
-            color: #0f766e;
-            font-weight: bold;
-            text-decoration: none;
-        }
-
-    </style>
-
-</head>
-
-
-<body>
-
-    <div class="container">
-
-        <h1>Create Account</h1>
-
-        <p>
-            Register to use the Skin Disease Detection System.
-        </p>
-
-
-        {% if messages %}
-
-            {% for message in messages %}
-
-                <div class="message">
-
-                    {{ message }}
-
-                </div>
-
-            {% endfor %}
-
+      <div class="form-group">
+        <label for="id_username">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <div class="field-error">{{ form.username.errors|join:', ' }}</div>
         {% endif %}
+      </div>
 
+      <div class="form-group">
+        <label for="id_email">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <div class="field-error">{{ form.email.errors|join:', ' }}</div>
+        {% endif %}
+      </div>
 
-        <form method="POST">
+      <div class="form-group">
+        <label for="id_password">Password</label>
+        {{ form.password }}
+        {% if form.password.errors %}
+          <div class="field-error">{{ form.password.errors|join:', ' }}</div>
+        {% endif %}
+      </div>
 
-            {% csrf_token %}
+      <div class="form-group">
+        <label for="id_confirm_password">Confirm Password</label>
+        {{ form.confirm_password }}
+        {% if form.confirm_password.errors %}
+          <div class="field-error">{{ form.confirm_password.errors|join:', ' }}</div>
+        {% endif %}
+      </div>
 
+      <div class="auth-actions">
+        <button class="primary-btn" type="submit" style="width:100%;">Register</button>
+      </div>
+    </form>
 
-            <input
-                type="text"
-                name="username"
-                placeholder="Enter Username"
-                required
-            >
-
-
-            <input
-                type="email"
-                name="email"
-                placeholder="Enter Email"
-                required
-            >
-
-
-            <input
-                type="password"
-                name="password"
-                placeholder="Enter Password"
-                required
-            >
-
-
-            <button type="submit">
-
-                Register
-
-            </button>
-
-
-        </form>
-
-
-        <p style="margin-top: 20px;">
-
-            Already have an account?
-
-            <a href="{% url 'login' %}">
-
-                Login
-
-            </a>
-
-        </p>
-
-
-    </div>
-
-</body>
-
-</html>
+    <p style="text-align:center; margin-top:24px; color:var(--muted);">
+      Already have an account?
+      <a class="auth-link" href="{% url 'login' %}">Login</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

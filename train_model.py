@@ -1,25 +1,18 @@
 import os
-
-# Reduce unnecessary TensorFlow resource usage
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
+import json
 import tensorflow as tf
 
+from tensorflow import keras
+from tensorflow.keras import layers
 
-# ==========================================================
-# CONFIGURATION
-# ==========================================================
 
-IMAGE_SIZE = (224, 224)
-BATCH_SIZE = 16
-EPOCHS = 10
+# --------------------------------------------------
+# PROJECT PATH
+# --------------------------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATASET_DIR = os.path.join(
-    BASE_DIR,
-    "dataset"
-)
+DATASET_DIR = os.path.join(BASE_DIR, "dataset")
 
 MODEL_PATH = os.path.join(
     BASE_DIR,
@@ -28,13 +21,26 @@ MODEL_PATH = os.path.join(
 
 CLASS_NAMES_PATH = os.path.join(
     BASE_DIR,
-    "class_names.txt"
+    "class_names.json"
 )
 
 
-# ==========================================================
+# --------------------------------------------------
+# SETTINGS
+# --------------------------------------------------
+
+IMAGE_SIZE = (224, 224)
+
+BATCH_SIZE = 16
+
+EPOCHS = 10
+
+SEED = 123
+
+
+# --------------------------------------------------
 # CHECK DATASET
-# ==========================================================
+# --------------------------------------------------
 
 if not os.path.exists(DATASET_DIR):
 
@@ -43,12 +49,12 @@ if not os.path.exists(DATASET_DIR):
     )
 
 
-# ==========================================================
+print("\nLoading dataset...\n")
+
+
+# --------------------------------------------------
 # LOAD TRAINING DATA
-# ==========================================================
-
-print("Loading training dataset...")
-
+# --------------------------------------------------
 
 train_dataset = tf.keras.utils.image_dataset_from_directory(
 
@@ -58,22 +64,17 @@ train_dataset = tf.keras.utils.image_dataset_from_directory(
 
     subset="training",
 
-    seed=123,
+    seed=SEED,
 
     image_size=IMAGE_SIZE,
 
-    batch_size=BATCH_SIZE,
-
-    label_mode="int"
+    batch_size=BATCH_SIZE
 )
 
 
-# ==========================================================
+# --------------------------------------------------
 # LOAD VALIDATION DATA
-# ==========================================================
-
-print("Loading validation dataset...")
-
+# --------------------------------------------------
 
 validation_dataset = tf.keras.utils.image_dataset_from_directory(
 
@@ -83,54 +84,44 @@ validation_dataset = tf.keras.utils.image_dataset_from_directory(
 
     subset="validation",
 
-    seed=123,
+    seed=SEED,
 
     image_size=IMAGE_SIZE,
 
-    batch_size=BATCH_SIZE,
-
-    label_mode="int"
+    batch_size=BATCH_SIZE
 )
 
 
-# ==========================================================
-# GET CLASS NAMES
-# ==========================================================
+# --------------------------------------------------
+# GET DISEASE NAMES
+# --------------------------------------------------
 
-CLASS_NAMES = train_dataset.class_names
+class_names = train_dataset.class_names
 
-print("\nDetected classes:")
+print("\nDiseases found:")
 
-for index, class_name in enumerate(CLASS_NAMES):
+for disease in class_names:
 
-    print(f"{index}: {class_name}")
+    print("-", disease)
 
 
-# ==========================================================
-# SAVE CLASS NAMES
-# ==========================================================
+# --------------------------------------------------
+# SAVE DISEASE NAMES
+# --------------------------------------------------
 
-with open(
-    CLASS_NAMES_PATH,
-    "w",
-    encoding="utf-8"
-) as file:
+with open(CLASS_NAMES_PATH, "w") as file:
 
-    for class_name in CLASS_NAMES:
-
-        file.write(
-            class_name + "\n"
-        )
+    json.dump(class_names, file)
 
 
 print(
-    f"\nClass names saved to: {CLASS_NAMES_PATH}"
+    "\nClass names saved successfully."
 )
 
 
-# ==========================================================
+# --------------------------------------------------
 # PERFORMANCE OPTIMIZATION
-# ==========================================================
+# --------------------------------------------------
 
 AUTOTUNE = tf.data.AUTOTUNE
 
@@ -144,153 +135,137 @@ validation_dataset = validation_dataset.prefetch(
 )
 
 
-# ==========================================================
+# --------------------------------------------------
 # DATA AUGMENTATION
-#
-# These layers are used during training.
-# ==========================================================
+# --------------------------------------------------
 
-data_augmentation = tf.keras.Sequential(
+data_augmentation = keras.Sequential([
 
-    [
+    layers.RandomFlip("horizontal"),
 
-        tf.keras.layers.RandomFlip(
-            "horizontal"
-        ),
+    layers.RandomRotation(0.1),
 
-        tf.keras.layers.RandomRotation(
-            0.1
-        ),
+    layers.RandomZoom(0.1),
 
-        tf.keras.layers.RandomZoom(
-            0.1
-        ),
-
-    ],
-
-    name="data_augmentation"
-)
+])
 
 
-# ==========================================================
+# --------------------------------------------------
 # CREATE MODEL
-# ==========================================================
+# --------------------------------------------------
 
-num_classes = len(
-    CLASS_NAMES
-)
+model = keras.Sequential([
 
+    layers.Input(
+        shape=(224, 224, 3)
+    ),
 
-model = tf.keras.Sequential(
+    layers.Rescaling(
+        1.0 / 255
+    ),
 
-    [
-
-        tf.keras.layers.Input(
-            shape=(224, 224, 3)
-        ),
-
-
-        # Rescale pixel values
-        tf.keras.layers.Rescaling(
-            1.0 / 255.0
-        ),
+    data_augmentation,
 
 
-        # DATA AUGMENTATION
-        data_augmentation,
+    # CNN LAYER 1
+
+    layers.Conv2D(
+
+        32,
+
+        (3, 3),
+
+        activation="relu",
+
+        padding="same"
+    ),
+
+    layers.MaxPooling2D(),
 
 
-        # CONVOLUTION BLOCK 1
-        tf.keras.layers.Conv2D(
-            32,
-            (3, 3),
-            activation="relu",
-            padding="same"
-        ),
+    # CNN LAYER 2
 
-        tf.keras.layers.MaxPooling2D(
-            (2, 2)
-        ),
+    layers.Conv2D(
 
+        64,
 
-        # CONVOLUTION BLOCK 2
-        tf.keras.layers.Conv2D(
-            64,
-            (3, 3),
-            activation="relu",
-            padding="same"
-        ),
+        (3, 3),
 
-        tf.keras.layers.MaxPooling2D(
-            (2, 2)
-        ),
+        activation="relu",
+
+        padding="same"
+    ),
+
+    layers.MaxPooling2D(),
 
 
-        # CONVOLUTION BLOCK 3
-        tf.keras.layers.Conv2D(
-            128,
-            (3, 3),
-            activation="relu",
-            padding="same"
-        ),
+    # CNN LAYER 3
 
-        tf.keras.layers.MaxPooling2D(
-            (2, 2)
-        ),
+    layers.Conv2D(
 
+        128,
 
-        # REDUCE PARAMETERS
-        tf.keras.layers.GlobalAveragePooling2D(),
+        (3, 3),
 
+        activation="relu",
 
-        # DROPOUT
-        tf.keras.layers.Dropout(
-            0.3
-        ),
+        padding="same"
+    ),
+
+    layers.MaxPooling2D(),
 
 
-        # OUTPUT LAYER
-        tf.keras.layers.Dense(
-            num_classes,
-            activation="softmax"
-        )
+    # CLASSIFICATION
 
-    ]
+    layers.GlobalAveragePooling2D(),
 
-)
+    layers.Dropout(0.3),
+
+    layers.Dense(
+
+        128,
+
+        activation="relu"
+    ),
+
+    layers.Dropout(0.2),
+
+    layers.Dense(
+
+        len(class_names),
+
+        activation="softmax"
+    )
+
+])
 
 
-# ==========================================================
+# --------------------------------------------------
 # COMPILE MODEL
-# ==========================================================
+# --------------------------------------------------
 
 model.compile(
 
-    optimizer=tf.keras.optimizers.Adam(
-        learning_rate=0.001
-    ),
+    optimizer="adam",
 
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+    loss="sparse_categorical_crossentropy",
 
-    metrics=[
-        "accuracy"
-    ]
-
+    metrics=["accuracy"]
 )
 
 
-# ==========================================================
+# --------------------------------------------------
 # DISPLAY MODEL
-# ==========================================================
+# --------------------------------------------------
 
 model.summary()
 
 
-# ==========================================================
+# --------------------------------------------------
 # CALLBACKS
-# ==========================================================
+# --------------------------------------------------
 
-early_stopping = tf.keras.callbacks.EarlyStopping(
+early_stopping = keras.callbacks.EarlyStopping(
 
     monitor="val_loss",
 
@@ -300,11 +275,11 @@ early_stopping = tf.keras.callbacks.EarlyStopping(
 )
 
 
-# ==========================================================
+# --------------------------------------------------
 # TRAIN MODEL
-# ==========================================================
+# --------------------------------------------------
 
-print("\nStarting model training...\n")
+print("\nTraining started...\n")
 
 
 history = model.fit(
@@ -315,52 +290,34 @@ history = model.fit(
 
     epochs=EPOCHS,
 
-    callbacks=[
-        early_stopping
-    ]
-
+    callbacks=[early_stopping]
 )
 
 
-# ==========================================================
-# EVALUATE MODEL
-# ==========================================================
-
-loss, accuracy = model.evaluate(
-    validation_dataset
-)
-
-
-print("\n==============================")
-
-print(
-    f"Validation Loss: {loss:.4f}"
-)
-
-print(
-    f"Validation Accuracy: {accuracy * 100:.2f}%"
-)
-
-print("==============================\n")
-
-
-# ==========================================================
+# --------------------------------------------------
 # SAVE MODEL
-# ==========================================================
+# --------------------------------------------------
 
 model.save(
+
     MODEL_PATH
 )
 
 
+print("\n--------------------------------")
+
+print("TRAINING COMPLETED SUCCESSFULLY")
+
+print("--------------------------------")
+
 print(
-    "Model successfully saved!"
+    f"\nModel saved at:\n{MODEL_PATH}"
 )
 
 print(
-    f"Model location: {MODEL_PATH}"
+    f"\nClasses saved at:\n{CLASS_NAMES_PATH}"
 )
 
 print(
-    f"Class names location: {CLASS_NAMES_PATH}"
+    "\nYou can now run your Django project."
 )
