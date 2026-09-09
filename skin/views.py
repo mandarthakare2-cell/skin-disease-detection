@@ -4,11 +4,12 @@ import urllib.request
 import numpy as np
 from PIL import Image
 
-# 1. Low-memory CPU settings for Render Free Tier
+# 1. Low-memory CPU settings for Render Free Tier (Set BEFORE importing TensorFlow)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Cleanly force CPU execution without GPU errors
 
 import tensorflow as tf
 from django.shortcuts import render, redirect
@@ -17,16 +18,29 @@ from django.contrib import messages
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 
-# Force CPU execution to prevent GPU memory allocation overhead
-tf.config.set_visible_devices([], 'GPU')
-
 logger = logging.getLogger('django')
 
 # Global variable to cache the loaded model
 _MODEL = None
 
-# Update this URL to your direct download link (e.g., GitHub Release, Dropbox, or Cloud Storage)
+# Direct download link for the model file
 MODEL_URL = "https://github.com/mandarthakare2-cell/skin-disease-detection/releases/download/v1.0/model.h5"
+
+
+def download_model_file(url, destination_path):
+    """Downloads model file in chunks with custom User-Agent to bypass GitHub 403 blocks."""
+    logger.info(f"Downloading model from {url}...")
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    )
+    with urllib.request.urlopen(req) as response, open(destination_path, 'wb') as out_file:
+        while True:
+            chunk = response.read(16384)
+            if not chunk:
+                break
+            out_file.write(chunk)
+    logger.info("Model download finished.")
 
 
 def get_model():
@@ -37,14 +51,14 @@ def get_model():
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, 'model.h5')
 
-        # Download model automatically if missing on Render container
-        if not os.path.exists(model_path):
-            logger.info(f"Model file missing. Downloading from {MODEL_URL}...")
+        # Download model automatically if missing or corrupt (0 bytes)
+        if not os.path.exists(model_path) or os.path.getsize(model_path) == 0:
             try:
-                urllib.request.urlretrieve(MODEL_URL, model_path)
-                logger.info("Model downloaded successfully.")
+                download_model_file(MODEL_URL, model_path)
             except Exception as e:
                 logger.error(f"Failed to download model file: {str(e)}")
+                if os.path.exists(model_path):
+                    os.remove(model_path)  # Cleanup broken/incomplete file
                 raise FileNotFoundError(f"Could not download model file: {str(e)}")
 
         logger.info(f"Loading TensorFlow model from {model_path}...")

@@ -12,8 +12,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-change-me-in-
 
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = ['*']  # Render assigns dynamic URLs; wildcard handles all incoming traffic
-
+ALLOWED_HOSTS = ['*']  # or ['.onrender.com', 'localhost', '127.0.0.1']
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

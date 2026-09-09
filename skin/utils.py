@@ -37,7 +37,18 @@ class ModelCache:
             return cls._model
 
         try:
+            os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+            os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
             import tensorflow as tf
+            try:
+                tf.config.set_visible_devices([], "GPU")
+                tf.config.threading.set_inter_op_parallelism_threads(1)
+                tf.config.threading.set_intra_op_parallelism_threads(1)
+            except Exception:
+                pass
+
             logger.info("Loading TensorFlow model...")
 
             model_candidates = [
@@ -67,6 +78,8 @@ class ModelCache:
                 )
 
             cls._model = tf.keras.models.load_model(model_path, compile=False)
+            import gc
+            gc.collect()
             logger.info(f"Model loaded successfully from {model_path}")
             return cls._model
 

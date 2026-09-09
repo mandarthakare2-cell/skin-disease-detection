@@ -66,7 +66,9 @@ def predict_image(request):
             image_array = ImageProcessor.process_image(tmp_path)
 
             # Make prediction
-            prediction_result = model.predict(image_array, verbose=0)
+            prediction_result = model(image_array, training=False).numpy()
+            import gc
+            gc.collect()
             predicted_idx = int(np.argmax(prediction_result[0]))
             confidence = float(np.max(prediction_result[0]) * 100)
 
@@ -181,7 +183,9 @@ def batch_predict(request):
                 try:
                     # Process
                     image_array = ImageProcessor.process_image(tmp_path)
-                    prediction_result = model.predict(image_array, verbose=0)
+                    prediction_result = model(image_array, training=False).numpy()
+                    import gc
+                    gc.collect()
 
                     predicted_idx = int(np.argmax(prediction_result[0]))
                     confidence = float(np.max(prediction_result[0]) * 100)

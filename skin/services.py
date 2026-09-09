@@ -31,7 +31,9 @@ class BatchPredictionService:
             for idx, image_path in enumerate(image_paths):
                 try:
                     image_array = ImageProcessor.process_image(image_path)
-                    prediction = model.predict(image_array, verbose=0)
+                    prediction = model(image_array, training=False).numpy()
+                    import gc
+                    gc.collect()
 
                     predicted_idx = int(np.argmax(prediction[0]))
                     confidence = float(np.max(prediction[0]) * 100)
