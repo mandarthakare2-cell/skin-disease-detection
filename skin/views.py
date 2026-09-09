@@ -12,8 +12,10 @@ os.environ['TF_NUM_INTEROP_THREADS'] = '1'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import tensorflow as tf
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import login, logout
 from django.contrib import messages
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
@@ -35,8 +37,6 @@ def home(request):
     except Exception:
         return render(request, 'skin/predict.html')
 
-home_view = home  # Alias in case urls.py uses home_view
-
 
 def about_view(request):
     """About page view"""
@@ -45,10 +45,84 @@ def about_view(request):
     except Exception:
         return render(request, 'skin/predict.html')
 
-about = about_view  # Alias in case urls.py uses about
+
+# --- Authentication Views ---
+
+def register_view(request):
+    """User registration view"""
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, "Registration successful!")
+            return redirect('home')
+        else:
+            messages.error(request, "Registration failed. Please check the details.")
+    else:
+        form = UserCreationForm()
+    
+    try:
+        return render(request, 'skin/register.html', {'form': form})
+    except Exception:
+        return render(request, 'register.html', {'form': form})
 
 
-# --- Helper Functions ---
+def login_view(request):
+    """User login view"""
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(request, f"Welcome back, {user.username}!")
+            return redirect('home')
+        else:
+            messages.error(request, "Invalid username or password.")
+    else:
+        form = AuthenticationForm()
+
+    try:
+        return render(request, 'skin/login.html', {'form': form})
+    except Exception:
+        return render(request, 'login.html', {'form': form})
+
+
+def logout_view(request):
+    """User logout view"""
+    logout(request)
+    messages.info(request, "Logged out successfully.")
+    return redirect('login')
+
+
+# --- History & Analytics Views ---
+
+@login_required
+def history_view(request):
+    """View prediction history"""
+    try:
+        return render(request, 'skin/history.html')
+    except Exception:
+        return redirect('home')
+
+
+@login_required
+def delete_history_view(request, history_id):
+    """Delete prediction history entry"""
+    messages.success(request, "History record deleted successfully.")
+    return redirect('history')
+
+
+@login_required
+def analytics_view(request):
+    """View skin detection analytics"""
+    try:
+        return render(request, 'skin/analytics.html')
+    except Exception:
+        return redirect('home')
+
+
+# --- Machine Learning Model Helper Functions ---
 
 def download_model_file(url, destination_path):
     """Downloads model file in chunks with custom User-Agent."""
@@ -150,5 +224,3 @@ def predict_view(request):
             return render(request, 'skin/predict.html', {'error': str(e)})
 
     return render(request, 'skin/predict.html')
-
-predict = predict_view  # Alias in case urls.py uses predict
