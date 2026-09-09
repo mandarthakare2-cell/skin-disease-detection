@@ -158,13 +158,13 @@ def get_model():
     global _MODEL
     if _MODEL is None:
         model_dir = os.path.join(settings.BASE_DIR, 'skin', 'model')
+        os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, 'model.h5')
 
+        # Auto-generate model if missing on the server
         if not os.path.exists(model_path):
-            raise FileNotFoundError(
-                f"Model file not found at '{model_path}'. "
-                "Please run 'python create_model.py' in your terminal to generate the model file."
-            )
+            from create_model import generate_and_save_model
+            generate_and_save_model()
 
         _MODEL = tf.keras.models.load_model(model_path, compile=False)
 
