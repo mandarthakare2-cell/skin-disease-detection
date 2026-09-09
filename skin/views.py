@@ -27,6 +27,14 @@ _MODEL = None
 MODEL_URL = "https://github.com/mandarthakare2-cell/skin-disease-detection/releases/download/v1.0/model.h5"
 
 
+def home(request):
+    """Home page view required by skin/urls.py"""
+    try:
+        return render(request, 'skin/home.html')
+    except Exception:
+        return render(request, 'skin/predict.html')
+
+
 def download_model_file(url, destination_path):
     """Downloads model file in chunks with custom User-Agent to bypass GitHub 403 blocks."""
     logger.info(f"Downloading model from {url}...")
