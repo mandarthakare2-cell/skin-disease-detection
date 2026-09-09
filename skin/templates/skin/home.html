@@ -136,7 +136,7 @@
     </div>
 
     <div class="panel">
-      <form method="post" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+      <form method="post" action="#analyze" enctype="multipart/form-data" class="upload-form" id="uploadForm">
         {% csrf_token %}
 
         <div class="dropzone" id="dropzone">
@@ -157,7 +157,7 @@
             <span class="spinner"></span>
             <span>Analyzing image...</span>
           </div>
-          <button class="primary-btn" type="submit">Analyze Image</button>
+          <button class="primary-btn" id="submitBtn" type="submit">Analyze Image</button>
         </div>
       </form>
     </div>
@@ -234,56 +234,78 @@
 </section>
 
 <script>
-  const dropzone = document.getElementById('dropzone');
-  const input = document.getElementById('imageInput');
-  const preview = document.getElementById('imagePreview');
-  const fileMeta = document.getElementById('fileMeta');
-  const form = document.getElementById('uploadForm');
-  const loadingIndicator = document.getElementById('loadingIndicator');
+  document.addEventListener('DOMContentLoaded', function () {
+    const dropzone = document.getElementById('dropzone');
+    const input = document.getElementById('imageInput');
+    const preview = document.getElementById('imagePreview');
+    const fileMeta = document.getElementById('fileMeta');
+    const form = document.getElementById('uploadForm');
+    const loadingIndicator = document.getElementById('loadingIndicator');
 
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'));
-  });
+    // Prevent default browser behavior on drag and drop events
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
 
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'));
-  });
+    // Add dragover visual feedback
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+    });
 
-  dropzone.addEventListener('click', (event) => {
-    if (event.target.closest('button, label')) return;
-    input.click();
-  });
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+    });
 
-  dropzone.addEventListener('drop', (event) => {
-    event.preventDefault();
-    const files = event.dataTransfer.files;
-    if (files && files.length) {
-      input.files = files;
-      updateFileMeta(files[0]);
+    // Open file dialog when clicking anywhere inside the dropzone EXCEPT direct label click
+    dropzone.addEventListener('click', (event) => {
+      if (event.target.closest('label, input')) return;
+      input.click();
+    });
+
+    // Handle dropped files
+    dropzone.addEventListener('drop', (event) => {
+      const files = event.dataTransfer.files;
+      if (files && files.length > 0) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        updateFileMeta(files[0]);
+      }
+    });
+
+    // Handle file selection via browse dialog
+    input.addEventListener('change', () => {
+      if (input.files && input.files.length > 0) {
+        updateFileMeta(input.files[0]);
+      }
+    });
+
+    // Handle form submission and validation
+    form.addEventListener('submit', (event) => {
+      if (!input.files || input.files.length === 0) {
+        event.preventDefault();
+        alert('Please select or drop an image file before analyzing.');
+        return false;
+      }
+      loadingIndicator.classList.add('visible');
+    });
+
+    // Update metadata and image preview
+    function updateFileMeta(file) {
+      fileMeta.textContent = file.name + ' • ' + (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          preview.src = e.target.result;
+          preview.classList.add('visible');
+        };
+        reader.readAsDataURL(file);
+      }
     }
   });
-
-  input.addEventListener('change', () => {
-    if (input.files && input.files.length) {
-      updateFileMeta(input.files[0]);
-    }
-  });
-
-  form.addEventListener('submit', () => {
-    loadingIndicator.classList.add('visible');
-  });
-
-  function updateFileMeta(file) {
-    fileMeta.textContent = file.name + ' • ' + (file.size / 1024 / 1024).toFixed(2) + ' MB';
-
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        preview.src = e.target.result;
-        preview.classList.add('visible');
-      };
-      reader.readAsDataURL(file);
-    }
-  }
 </script>
 {% endblock %}
