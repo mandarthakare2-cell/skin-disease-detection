@@ -4,7 +4,7 @@ import urllib.request
 import numpy as np
 from PIL import Image
 
-# Low-memory CPU settings for Render Free Tier
+# Low-memory CPU settings for deployment environments
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
@@ -22,31 +22,68 @@ from django.core.files.storage import FileSystemStorage
 
 logger = logging.getLogger('django')
 
-# Global variable to cache the loaded model
+# Global cached model
 _MODEL = None
-
 MODEL_URL = "https://github.com/mandarthakare2-cell/skin-disease-detection/releases/download/v1.0/model.h5"
 
+# Metadata for HAM10000 Skin Conditions
+DISEASE_INFO = {
+    'Actinic keratoses': {
+        'description': 'A rough, scaly patch on the skin caused by years of sun exposure. It is considered a precancerous condition.',
+        'symptoms': ['Rough or scaly skin patch', 'Flat to slightly raised bump', 'Itching or burning feeling', 'Pink, red, or brown discoloration'],
+        'precautions': ['Avoid direct sun exposure', 'Wear broad-spectrum sunscreen (SPF 30+)', 'Wear protective clothing and broad-brimmed hats', 'Avoid tanning beds'],
+        'advice': 'Consult a dermatologist for evaluation. Actinic keratosis should be treated to prevent potential progression to squamous cell carcinoma.'
+    },
+    'Basal cell carcinoma': {
+        'description': 'A type of skin cancer that begins in the basal cells. It often appears as a slightly transparent bump on sun-exposed skin.',
+        'symptoms': ['Pearly or waxy bump', 'Flat, firm, flesh-colored or brown scar-like lesion', 'Bleeding or scabbing sore that heals and returns'],
+        'precautions': ['Minimize sun exposure during peak hours', 'Perform regular self-examinations', 'Use daily sun protection'],
+        'advice': 'Requires prompt medical evaluation and treatment by a dermatologist or oncologist.'
+    },
+    'Benign keratosis': {
+        'description': 'A non-cancerous skin condition that includes seborrheic keratoses. Commonly appears as waxy, raised growths as people age.',
+        'symptoms': ['Waxy, stuck-on skin appearance', 'Round or oval shape', 'Color ranges from light tan to black', 'Slightly raised surface'],
+        'precautions': ['Avoid scratching or picking at the lesions', 'Keep the skin moisturized', 'Protect skin from severe friction'],
+        'advice': 'Benign keratoses are harmless, but seek medical evaluation if a lesion changes size, bleeds, or causes discomfort.'
+    },
+    'Dermatofibroma': {
+        'description': 'Common non-cancerous skin growths that usually appear as small, firm bumps on the lower legs.',
+        'symptoms': ['Firm, hard bump under the skin', 'Dimples inward when pinched', 'Color ranges from red-brown to pink', 'Usually painless'],
+        'precautions': ['Avoid picking or attempting to remove at home', 'Protect skin from local trauma or insect bites'],
+        'advice': 'Generally harmless and requires no treatment unless it becomes painful or cosmetically concerning.'
+    },
+    'Melanoma': {
+        'description': 'The most serious type of skin cancer, developing in melanocytes. Early detection and treatment are essential.',
+        'symptoms': ['Asymmetrical shape or irregular borders', 'Color variations (black, brown, red, white)', 'Diameter greater than 6mm', 'Evolving size, shape, or color'],
+        'precautions': ['Strict sun protection', 'Perform monthly self-skin checks (ABCDE rule)', 'Avoid sunburns'],
+        'advice': 'URGENT: Schedule an immediate medical evaluation with a dermatologist.'
+    },
+    'Melanocytic nevi': {
+        'description': 'Common moles formed by clusters of melanocytes. Most moles are completely benign and common.',
+        'symptoms': ['Uniform brown, tan, or black color', 'Distinct, smooth border', 'Flat or slightly raised round shape'],
+        'precautions': ['Monitor for changes in size, shape, or color', 'Use sun protection to prevent dysplastic changes'],
+        'advice': 'Harmless, but any mole that changes rapidly or bleeds should be inspected by a doctor.'
+    },
+    'Vascular lesions': {
+        'description': 'Skin anomalies involving blood vessels, such as cherry angiomas, hemangiomas, or port-wine stains.',
+        'symptoms': ['Red, purple, or blue skin discoloration', 'Raised bumps or flat red spots', 'May bleed if scratched'],
+        'precautions': ['Avoid irritating or scratching the area', 'Protect fragile lesions from friction'],
+        'advice': 'Usually benign. Seek medical advice if bleeding is persistent or if rapid growth occurs.'
+    }
+}
 
-# --- Page Views Required by skin/urls.py ---
+
+# --- Page Views ---
 
 def home(request):
     """Home page view"""
-    try:
-        return render(request, 'skin/home.html')
-    except Exception:
-        return render(request, 'skin/predict.html')
+    return render(request, 'skin/home.html')
 
 
 def about_view(request):
     """About page view"""
-    try:
-        return render(request, 'skin/about.html')
-    except Exception:
-        return render(request, 'skin/predict.html')
+    return render(request, 'skin/about.html')
 
-
-# --- Authentication Views ---
 
 def register_view(request):
     """User registration view"""
@@ -57,15 +94,10 @@ def register_view(request):
             login(request, user)
             messages.success(request, "Registration successful!")
             return redirect('home')
-        else:
-            messages.error(request, "Registration failed. Please check the details.")
+        messages.error(request, "Registration failed.")
     else:
         form = UserCreationForm()
-    
-    try:
-        return render(request, 'skin/register.html', {'form': form})
-    except Exception:
-        return render(request, 'register.html', {'form': form})
+    return render(request, 'skin/register.html', {'form': form})
 
 
 def login_view(request):
@@ -77,15 +109,10 @@ def login_view(request):
             login(request, user)
             messages.success(request, f"Welcome back, {user.username}!")
             return redirect('home')
-        else:
-            messages.error(request, "Invalid username or password.")
+        messages.error(request, "Invalid username or password.")
     else:
         form = AuthenticationForm()
-
-    try:
-        return render(request, 'skin/login.html', {'form': form})
-    except Exception:
-        return render(request, 'login.html', {'form': form})
+    return render(request, 'skin/login.html', {'form': form})
 
 
 def logout_view(request):
@@ -95,37 +122,25 @@ def logout_view(request):
     return redirect('login')
 
 
-# --- History & Analytics Views ---
-
 @login_required
 def history_view(request):
-    """View prediction history"""
-    try:
-        return render(request, 'skin/history.html')
-    except Exception:
-        return redirect('home')
+    return render(request, 'skin/history.html')
 
 
 @login_required
 def delete_history_view(request, history_id):
-    """Delete prediction history entry"""
-    messages.success(request, "History record deleted successfully.")
+    messages.success(request, "Record deleted.")
     return redirect('history')
 
 
 @login_required
 def analytics_view(request):
-    """View skin detection analytics"""
-    try:
-        return render(request, 'skin/analytics.html')
-    except Exception:
-        return redirect('home')
+    return render(request, 'skin/analytics.html')
 
 
-# --- Machine Learning Model Helper Functions ---
+# --- Model Helper Logic ---
 
 def download_model_file(url, destination_path):
-    """Downloads model file in chunks with custom User-Agent."""
     logger.info(f"Downloading model from {url}...")
     req = urllib.request.Request(
         url,
@@ -137,11 +152,9 @@ def download_model_file(url, destination_path):
             if not chunk:
                 break
             out_file.write(chunk)
-    logger.info("Model download finished.")
 
 
 def get_model():
-    """Downloads model if missing, lazy loads it into memory once, and caches it."""
     global _MODEL
     if _MODEL is None:
         model_dir = os.path.join(settings.BASE_DIR, 'skin', 'model')
@@ -152,20 +165,17 @@ def get_model():
             try:
                 download_model_file(MODEL_URL, model_path)
             except Exception as e:
-                logger.error(f"Failed to download model file: {str(e)}")
+                logger.error(f"Download failed: {str(e)}")
                 if os.path.exists(model_path):
                     os.remove(model_path)
-                raise FileNotFoundError(f"Could not download model file: {str(e)}")
+                raise FileNotFoundError(f"Model download failed: {str(e)}")
 
-        logger.info(f"Loading TensorFlow model from {model_path}...")
         _MODEL = tf.keras.models.load_model(model_path, compile=False)
-        logger.info("Model loaded successfully.")
 
     return _MODEL
 
 
 def preprocess_image(image_path, target_size=(224, 224)):
-    """Preprocess uploaded skin image to match TensorFlow model dimensions."""
     img = Image.open(image_path).convert('RGB')
     img = img.resize(target_size)
     img_array = np.array(img, dtype=np.float32) / 255.0
@@ -173,10 +183,9 @@ def preprocess_image(image_path, target_size=(224, 224)):
     return img_array
 
 
-# --- Prediction View ---
+# --- Prediction Route View ---
 
 def predict_view(request):
-    """Handles image upload and outputs skin disease classification results."""
     if request.method == 'POST' and request.FILES.get('image'):
         try:
             image_file = request.FILES['image']
@@ -191,36 +200,49 @@ def predict_view(request):
 
             model = get_model()
             processed_img = preprocess_image(uploaded_file_path)
-            predictions = model.predict(processed_img)
+            predictions = model.predict(processed_img)[0]
 
             class_names = [
                 'Actinic keratoses', 'Basal cell carcinoma', 'Benign keratosis',
                 'Dermatofibroma', 'Melanoma', 'Melanocytic nevi', 'Vascular lesions'
             ]
 
-            predicted_class_idx = np.argmax(predictions[0])
-            confidence = round(float(predictions[0][predicted_class_idx]) * 100, 2)
+            predicted_class_idx = int(np.argmax(predictions))
+            predicted_label = class_names[predicted_class_idx]
+            confidence = round(float(predictions[predicted_class_idx]) * 100, 2)
 
-            if predicted_class_idx < len(class_names):
-                result_label = class_names[predicted_class_idx]
-            else:
-                result_label = f"Class {predicted_class_idx}"
+            # Build class probability ranking
+            class_scores = []
+            for idx, prob in enumerate(predictions):
+                class_scores.append({
+                    'label': class_names[idx],
+                    'value': round(float(prob) * 100, 2)
+                })
+            class_scores = sorted(class_scores, key=lambda x: x['value'], reverse=True)
+
+            # Retrieve disease info metadata
+            info = DISEASE_INFO.get(predicted_label, {
+                'description': 'No specific description available.',
+                'symptoms': ['N/A'],
+                'precautions': ['Consult a doctor for further evaluation.'],
+                'advice': 'Consult a dermatologist.'
+            })
 
             context = {
-                'prediction': result_label,
+                'prediction': predicted_label,
                 'confidence': confidence,
-                'image_url': file_url
+                'image_url': file_url,
+                'description': info['description'],
+                'symptoms': info['symptoms'],
+                'precautions': info['precautions'],
+                'medical_advice': info['advice'],
+                'class_scores': class_scores
             }
-            return render(request, 'skin/result.html', context)
 
-        except FileNotFoundError as fnf_error:
-            logger.error(f"FileNotFoundError in predict_view: {str(fnf_error)}")
-            messages.error(request, "AI Model file is missing on the server. Please check deployment settings.")
-            return render(request, 'skin/predict.html', {'error': str(fnf_error)})
+            return render(request, 'skin/home.html', context)
 
         except Exception as e:
-            logger.exception("Prediction failure during processing:")
-            messages.error(request, f"An error occurred during analysis: {str(e)}")
-            return render(request, 'skin/predict.html', {'error': str(e)})
+            logger.exception("Prediction failure:")
+            return render(request, 'skin/home.html', {'error': f"Error processing image: {str(e)}"})
 
-    return render(request, 'skin/predict.html')
+    return render(request, 'skin/home.html')

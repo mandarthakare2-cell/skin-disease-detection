@@ -136,7 +136,8 @@
     </div>
 
     <div class="panel">
-      <form method="post" action="#analyze" enctype="multipart/form-data" class="upload-form" id="uploadForm">
+      <!-- FORM SUBMITS TO PREDICT ROUTE -->
+      <form method="post" action="{% url 'predict' %}" enctype="multipart/form-data" class="upload-form" id="uploadForm">
         {% csrf_token %}
 
         <div class="dropzone" id="dropzone">
@@ -185,7 +186,6 @@
               <div class="progress-bar" style="width: {{ confidence }}%;"></div>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -242,7 +242,7 @@
     const form = document.getElementById('uploadForm');
     const loadingIndicator = document.getElementById('loadingIndicator');
 
-    // Prevent default browser behavior on drag and drop events
+    // Prevent default browser behavior for drag and drop
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       dropzone.addEventListener(eventName, (e) => {
         e.preventDefault();
@@ -250,7 +250,6 @@
       }, false);
     });
 
-    // Add dragover visual feedback
     ['dragenter', 'dragover'].forEach(eventName => {
       dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
     });
@@ -259,13 +258,13 @@
       dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
     });
 
-    // Open file dialog when clicking anywhere inside the dropzone EXCEPT direct label click
+    // Trigger file dialog on dropzone click
     dropzone.addEventListener('click', (event) => {
       if (event.target.closest('label, input')) return;
       input.click();
     });
 
-    // Handle dropped files
+    // Handle dropped file
     dropzone.addEventListener('drop', (event) => {
       const files = event.dataTransfer.files;
       if (files && files.length > 0) {
@@ -276,24 +275,23 @@
       }
     });
 
-    // Handle file selection via browse dialog
+    // Handle standard browse selection
     input.addEventListener('change', () => {
       if (input.files && input.files.length > 0) {
         updateFileMeta(input.files[0]);
       }
     });
 
-    // Handle form submission and validation
+    // Validate image selection on form submit
     form.addEventListener('submit', (event) => {
       if (!input.files || input.files.length === 0) {
         event.preventDefault();
-        alert('Please select or drop an image file before analyzing.');
+        alert('Please select or drag an image before analyzing.');
         return false;
       }
       loadingIndicator.classList.add('visible');
     });
 
-    // Update metadata and image preview
     function updateFileMeta(file) {
       fileMeta.textContent = file.name + ' • ' + (file.size / (1024 * 1024)).toFixed(2) + ' MB';
 
