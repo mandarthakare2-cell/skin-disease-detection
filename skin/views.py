@@ -158,17 +158,13 @@ def get_model():
     global _MODEL
     if _MODEL is None:
         model_dir = os.path.join(settings.BASE_DIR, 'skin', 'model')
-        os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, 'model.h5')
 
-        if not os.path.exists(model_path) or os.path.getsize(model_path) == 0:
-            try:
-                download_model_file(MODEL_URL, model_path)
-            except Exception as e:
-                logger.error(f"Download failed: {str(e)}")
-                if os.path.exists(model_path):
-                    os.remove(model_path)
-                raise FileNotFoundError(f"Model download failed: {str(e)}")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"Model file not found at '{model_path}'. "
+                "Please run 'python create_model.py' in your terminal to generate the model file."
+            )
 
         _MODEL = tf.keras.models.load_model(model_path, compile=False)
 
