@@ -4,12 +4,12 @@ import urllib.request
 import numpy as np
 from PIL import Image
 
-# 1. Low-memory CPU settings for Render Free Tier (Set BEFORE importing TensorFlow)
+# Low-memory CPU settings for Render Free Tier
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
 os.environ['TF_NUM_INTEROP_THREADS'] = '1'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Cleanly force CPU execution without GPU errors
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import tensorflow as tf
 from django.shortcuts import render, redirect
@@ -23,20 +23,35 @@ logger = logging.getLogger('django')
 # Global variable to cache the loaded model
 _MODEL = None
 
-# Direct download link for the model file
 MODEL_URL = "https://github.com/mandarthakare2-cell/skin-disease-detection/releases/download/v1.0/model.h5"
 
 
+# --- Page Views Required by skin/urls.py ---
+
 def home(request):
-    """Home page view required by skin/urls.py"""
+    """Home page view"""
     try:
         return render(request, 'skin/home.html')
     except Exception:
         return render(request, 'skin/predict.html')
 
+home_view = home  # Alias in case urls.py uses home_view
+
+
+def about_view(request):
+    """About page view"""
+    try:
+        return render(request, 'skin/about.html')
+    except Exception:
+        return render(request, 'skin/predict.html')
+
+about = about_view  # Alias in case urls.py uses about
+
+
+# --- Helper Functions ---
 
 def download_model_file(url, destination_path):
-    """Downloads model file in chunks with custom User-Agent to bypass GitHub 403 blocks."""
+    """Downloads model file in chunks with custom User-Agent."""
     logger.info(f"Downloading model from {url}...")
     req = urllib.request.Request(
         url,
@@ -59,14 +74,13 @@ def get_model():
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, 'model.h5')
 
-        # Download model automatically if missing or corrupt (0 bytes)
         if not os.path.exists(model_path) or os.path.getsize(model_path) == 0:
             try:
                 download_model_file(MODEL_URL, model_path)
             except Exception as e:
                 logger.error(f"Failed to download model file: {str(e)}")
                 if os.path.exists(model_path):
-                    os.remove(model_path)  # Cleanup broken/incomplete file
+                    os.remove(model_path)
                 raise FileNotFoundError(f"Could not download model file: {str(e)}")
 
         logger.info(f"Loading TensorFlow model from {model_path}...")
@@ -85,24 +99,22 @@ def preprocess_image(image_path, target_size=(224, 224)):
     return img_array
 
 
-@login_required
+# --- Prediction View ---
+
 def predict_view(request):
     """Handles image upload and outputs skin disease classification results."""
     if request.method == 'POST' and request.FILES.get('image'):
         try:
             image_file = request.FILES['image']
 
-            # Dynamic Media Root directory handling
             media_root = getattr(settings, 'MEDIA_ROOT', os.path.join(settings.BASE_DIR, 'media'))
             os.makedirs(media_root, exist_ok=True)
 
-            # Store uploaded image file
             fs = FileSystemStorage(location=media_root)
             filename = fs.save(image_file.name, image_file)
             uploaded_file_path = fs.path(filename)
             file_url = fs.url(filename)
 
-            # Retrieve model and predict
             model = get_model()
             processed_img = preprocess_image(uploaded_file_path)
             predictions = model.predict(processed_img)
@@ -138,3 +150,5 @@ def predict_view(request):
             return render(request, 'skin/predict.html', {'error': str(e)})
 
     return render(request, 'skin/predict.html')
+
+predict = predict_view  # Alias in case urls.py uses predict
